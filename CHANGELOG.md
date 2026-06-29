@@ -5,6 +5,17 @@ Format: `[version] YYYY-MM-DD — description`
 
 ---
 
+## [1.1.6] 2026-06-29 — Fix camera toggle + async OCR feedback
+
+### ✅ Fixed
+- **Removed duplicate `startCamera` function** — a leftover from v1.1.4 was overriding the v1.1.5 code, causing the toggle button logic to never run
+- **Fixed object comparison bug** — `cameraId === { facingMode: 'environment' }` was always false (object reference comparison), so saved camera IDs weren't being used properly. Now uses a boolean flag `usingSaved`
+- **Always enumerate cameras** — even when a saved camera ID exists, `getCameras()` is called so `_camDevices` is populated, which is required for the toggle button to appear
+- **OCR now opens modal immediately** — instead of making the user wait while OCR runs, the modal opens instantly with "Reading label..." status. Fields auto-fill when OCR completes. If OCR fails, the status updates to show the error and the user can type manually or use Re-capture/Photo
+- **Removed `ocrStatus` override from `openPM`** — the modal no longer resets the status text, so the caller's status messages ("Reading label...", error messages) are preserved
+
+---
+
 ## [1.1.5] 2026-06-29 — Camera toggle + scan-time OCR capture
 
 ### ✅ Changed

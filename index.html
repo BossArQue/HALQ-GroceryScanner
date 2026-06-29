@@ -487,20 +487,18 @@ function startCamera(){
 
   var scanConfig = { fps: 30, qrbox: { width: 260, height: 160 }, formatsToSupport: formats };
 
-  // If we have a saved camera ID, use it directly
-  if(_savedCamId){
-    startScanner(_savedCamId, scanConfig);
-    return;
-  }
-
-  // Enumerate cameras to pick rear and populate selector
+  // Always enumerate cameras first so _camDevices is populated for the toggle button
   if(typeof Html5Qrcode !== 'undefined' && typeof Html5Qrcode.getCameras === 'function'){
     Html5Qrcode.getCameras().then(function(devices){
       _camDevices = devices || [];
-      populateCamSelector(_camDevices);
 
       var cameraId = { facingMode: 'environment' };
-      if(_camDevices.length){
+      var usingSaved = false;
+      if(_savedCamId){
+        var savedDevice = _camDevices.find(function(d){ return d.id === _savedCamId; });
+        if(savedDevice){ cameraId = _savedCamId; usingSaved = true; }
+      }
+      if(!usingSaved && _camDevices.length){
         var backCam = _camDevices.find(function(d){
           var l = d.label.toLowerCase();
           return l.indexOf('back') !== -1 || l.indexOf('rear') !== -1 || l.indexOf('environment') !== -1;
@@ -530,61 +528,6 @@ function toggleCamera(){
   try{ localStorage.setItem('gscan_cam', _savedCamId); }catch(e){}
   stopCamera();
   setTimeout(startCamera, 300);
-}
-
-function startCamera(){
-  if(camActive) return;
-  if(typeof Html5Qrcode === 'undefined'){
-    setScanMsg('⚠️ Scanner library not loaded. Check internet connection and refresh the page.');
-    return;
-  }
-
-  setScanMsg('Starting camera...');
-  document.getElementById('startCamBtn').disabled = true;
-  document.getElementById('qr-reader').innerHTML = '';
-
-  var formats = [];
-  if(typeof Html5QrcodeSupportedFormats !== 'undefined'){
-    formats = [
-      Html5QrcodeSupportedFormats.CODE_128,
-      Html5QrcodeSupportedFormats.EAN_13,
-      Html5QrcodeSupportedFormats.EAN_8,
-      Html5QrcodeSupportedFormats.UPC_A,
-      Html5QrcodeSupportedFormats.UPC_E,
-      Html5QrcodeSupportedFormats.CODE_39
-    ];
-  }
-
-  var scanConfig = { fps: 30, qrbox: { width: 260, height: 160 }, formatsToSupport: formats };
-
-  // If we have a saved camera ID, use it directly
-  if(_savedCamId){
-    startScanner(_savedCamId, scanConfig);
-    return;
-  }
-
-  // Enumerate cameras to pick rear
-  if(typeof Html5Qrcode !== 'undefined' && typeof Html5Qrcode.getCameras === 'function'){
-    Html5Qrcode.getCameras().then(function(devices){
-      _camDevices = devices || [];
-
-      var cameraId = { facingMode: 'environment' };
-      if(_camDevices.length){
-        var backCam = _camDevices.find(function(d){
-          var l = d.label.toLowerCase();
-          return l.indexOf('back') !== -1 || l.indexOf('rear') !== -1 || l.indexOf('environment') !== -1;
-        });
-        var rearCam = backCam || _camDevices[_camDevices.length - 1];
-        if(rearCam) cameraId = rearCam.id;
-      }
-      startScanner(cameraId, scanConfig);
-    }).catch(function(err){
-      console.log('getCameras failed:', err);
-      startScanner({ facingMode: 'environment' }, scanConfig);
-    });
-  } else {
-    startScanner({ facingMode: 'environment' }, scanConfig);
-  }
 }
 
 function startScanner(cameraId, config){
@@ -664,8 +607,10 @@ function onScan(code){
     return;
   }
 
-  // Brand new — capture frame and OCR for name/price before opening modal
-  setScanMsg('New product! Capturing label...');
+  // Brand new — open modal immediately, capture frame and OCR async
+  openPM(code, false, '', '');
+  document.getElementById('ocrStatus').textContent = 'Reading label...';
+
   var video = document.querySelector('#qr-reader video');
   if(video && video.readyState >= 2 && camActive){
     var c = document.createElement('canvas');
@@ -681,24 +626,32 @@ function onScan(code){
           var text = result.data.text;
           console.log('OCR on scan:', text);
           var parsed = parseOCR(text);
-          var name = parsed.name || '';
-          var price = parsed.price !== null ? parsed.price.toFixed(2) : '';
-          openPM(code, false, name, price);
-          if(parsed.name || parsed.price !== null){
+          var msgs = [];
+          if(parsed.name){
+            document.getElementById('mProdName').value = parsed.name;
+            msgs.push('Name: "' + parsed.name + '"');
+          }
+          if(parsed.price !== null){
+            document.getElementById('mProdPrice').value = parsed.price.toFixed(2);
+            msgs.push('Price: ₱' + parsed.price.toFixed(2));
+          }
+          if(msgs.length){
+            document.getElementById('ocrStatus').innerHTML = '<span class="ocrtag">Detected</span> ' + msgs.join(' · ');
             toast('Label captured! Review and save.');
+          } else {
+            document.getElementById('ocrStatus').textContent = 'Could not read label. Type manually or use Re-capture / Photo.';
           }
         }).catch(function(err){
           console.error('OCR error:', err);
-          openPM(code, false, '', '');
+          document.getElementById('ocrStatus').textContent = 'Could not read label. Type manually or use Re-capture / Photo.';
         });
       });
     }).catch(function(err){
       console.error('Tesseract load error:', err);
-      openPM(code, false, '', '');
+      document.getElementById('ocrStatus').textContent = 'OCR engine unavailable. Type manually or use Photo.';
     });
   } else {
-    // No camera frame available, open blank modal
-    openPM(code, false, '', '');
+    document.getElementById('ocrStatus').textContent = 'Camera not running. Type manually or use Photo.';
   }
 }
 
@@ -723,7 +676,6 @@ function openPM(code, edit, name, price){
   document.getElementById('mProdPrice').value = price;
   document.getElementById('mProdSaveBtn').textContent = edit ? 'Update Product' : 'Save & Add to Cart';
   document.getElementById('ocrBox').style.display = edit ? 'none' : 'flex';
-  document.getElementById('ocrStatus').textContent = name || price ? 'Label captured from scan' : 'Camera not running. Use Photo option or start camera first.';
   document.getElementById('mProduct').classList.remove('hidden');
   setTimeout(function(){ document.getElementById('mProdName').focus(); }, 300);
 }
@@ -1179,7 +1131,7 @@ renderHome();
 <div id="versionFooter" style="position:fixed;bottom:0;left:0;right:0;text-align:center;padding:4px;font-size:10px;color:var(--muted);background:var(--bg);border-top:1px solid var(--border);z-index:50;pointer-events:none;"></div>
 <script>
 (function(){
-  var v = 'v1.1.5';
+  var v = 'v1.1.6';
   var b = document.querySelector('.bnav');
   var f = document.getElementById('versionFooter');
   if(f) f.textContent = 'GroceryScan ' + v + ' · ' + new Date().toLocaleDateString('en-PH',{month:'short',day:'numeric'});
