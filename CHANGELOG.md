@@ -5,6 +5,16 @@ Format: `[version] YYYY-MM-DD — description`
 
 ---
 
+## [1.1.5] 2026-06-29 — Camera toggle + scan-time OCR capture
+
+### ✅ Changed
+- **Removed camera dropdown, replaced with "🔄 Switch Camera" toggle button** — tap to cycle through available cameras. Only shows when 2+ cameras detected. Selection still saved to localStorage
+- **OCR now runs at scan time, not modal time** — when a new product barcode is detected, the app immediately captures the current video frame and runs OCR BEFORE opening the modal. This means the label is captured while still in frame, not after the user moves the camera
+- **Known products bypass OCR** — if the barcode is already in the database, it adds to cart immediately without any OCR delay. OCR only runs for new products
+- **Removed modal auto-capture** — the 600ms delayed auto-capture in the modal is gone since capture now happens at scan time
+
+---
+
 ## [1.1.4] 2026-06-29 — Camera selector + simplified config
 
 ### ✅ Fixed

@@ -333,13 +333,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
 
     <div id="scanMsg" style="text-align:center;color:var(--muted);font-size:13px;line-height:1.6;min-height:36px;"></div>
 
-    <!-- Camera selector -->
-    <div class="card" id="camSelector" style="display:none;padding:12px 16px;">
-      <div class="fg">
-        <label class="fl">Camera</label>
-        <select class="si" id="camSelect" onchange="onCamChange()"></select>
-      </div>
-    </div>
+    <!-- Camera toggle -->
+    <button class="btn bg bfull hidden" id="camToggleBtn" onclick="toggleCamera()" style="margin-top:4px;">🔄 Switch Camera</button>
 
     <!-- Start / Retry button -->
     <button class="btn bp bfull" id="startCamBtn" onclick="startCamera()">▶ Start Camera</button>
@@ -523,31 +518,72 @@ function startCamera(){
   }
 }
 
-function populateCamSelector(devices){
-  var sel = document.getElementById('camSelect');
-  var wrap = document.getElementById('camSelector');
-  if(!sel || !wrap) return;
-  sel.innerHTML = '';
-  devices.forEach(function(d, i){
-    var opt = document.createElement('option');
-    opt.value = d.id;
-    opt.textContent = d.label || 'Camera ' + (i + 1);
-    sel.appendChild(opt);
-  });
+function toggleCamera(){
+  if(!camActive || !_camDevices.length) return;
+  var currentIdx = 0;
   if(_savedCamId){
-    sel.value = _savedCamId;
+    currentIdx = _camDevices.findIndex(function(d){ return d.id === _savedCamId; });
+    if(currentIdx === -1) currentIdx = 0;
   }
-  wrap.style.display = devices.length > 1 ? 'block' : 'none';
+  var nextIdx = (currentIdx + 1) % _camDevices.length;
+  _savedCamId = _camDevices[nextIdx].id;
+  try{ localStorage.setItem('gscan_cam', _savedCamId); }catch(e){}
+  stopCamera();
+  setTimeout(startCamera, 300);
 }
 
-function onCamChange(){
-  var sel = document.getElementById('camSelect');
-  if(!sel) return;
-  _savedCamId = sel.value;
-  try{ localStorage.setItem('gscan_cam', _savedCamId); }catch(e){}
-  if(camActive){
-    stopCamera();
-    setTimeout(startCamera, 300);
+function startCamera(){
+  if(camActive) return;
+  if(typeof Html5Qrcode === 'undefined'){
+    setScanMsg('⚠️ Scanner library not loaded. Check internet connection and refresh the page.');
+    return;
+  }
+
+  setScanMsg('Starting camera...');
+  document.getElementById('startCamBtn').disabled = true;
+  document.getElementById('qr-reader').innerHTML = '';
+
+  var formats = [];
+  if(typeof Html5QrcodeSupportedFormats !== 'undefined'){
+    formats = [
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.CODE_39
+    ];
+  }
+
+  var scanConfig = { fps: 30, qrbox: { width: 260, height: 160 }, formatsToSupport: formats };
+
+  // If we have a saved camera ID, use it directly
+  if(_savedCamId){
+    startScanner(_savedCamId, scanConfig);
+    return;
+  }
+
+  // Enumerate cameras to pick rear
+  if(typeof Html5Qrcode !== 'undefined' && typeof Html5Qrcode.getCameras === 'function'){
+    Html5Qrcode.getCameras().then(function(devices){
+      _camDevices = devices || [];
+
+      var cameraId = { facingMode: 'environment' };
+      if(_camDevices.length){
+        var backCam = _camDevices.find(function(d){
+          var l = d.label.toLowerCase();
+          return l.indexOf('back') !== -1 || l.indexOf('rear') !== -1 || l.indexOf('environment') !== -1;
+        });
+        var rearCam = backCam || _camDevices[_camDevices.length - 1];
+        if(rearCam) cameraId = rearCam.id;
+      }
+      startScanner(cameraId, scanConfig);
+    }).catch(function(err){
+      console.log('getCameras failed:', err);
+      startScanner({ facingMode: 'environment' }, scanConfig);
+    });
+  } else {
+    startScanner({ facingMode: 'environment' }, scanConfig);
   }
 }
 
@@ -565,6 +601,7 @@ function startScanner(cameraId, config){
     document.getElementById('scanFrameOverlay').style.display = 'flex';
     document.getElementById('startCamBtn').classList.add('hidden');
     document.getElementById('stopCamBtn').classList.remove('hidden');
+    document.getElementById('camToggleBtn').classList.toggle('hidden', _camDevices.length < 2);
   }).catch(function(err){
     camActive = false;
     document.getElementById('startCamBtn').disabled = false;
@@ -595,6 +632,7 @@ function stopCamera(){
       document.getElementById('startCamBtn').classList.remove('hidden');
       document.getElementById('startCamBtn').disabled = false;
       document.getElementById('stopCamBtn').classList.add('hidden');
+      document.getElementById('camToggleBtn').classList.add('hidden');
       setScanMsg('');
     }).catch(function(){
       qrScanner=null; camActive=false;
@@ -614,17 +652,53 @@ function onScan(code){
   playBeep();
 
   var p = S.products[code];
-  if(!p){
-    // Brand new — open add modal
-    openPM(code, false, '', '');
-  } else if(S.verifyMode){
-    // Always-confirm mode
-    openVerify(code, p.name, p.price);
+  if(p){
+    // Known product — add directly or verify
+    if(S.verifyMode){
+      openVerify(code, p.name, p.price);
+    } else {
+      addToCart(code, p.name, p.price);
+      showLastScanned(p.name, p.price, code);
+      toast('✓ Added: ' + p.name);
+    }
+    return;
+  }
+
+  // Brand new — capture frame and OCR for name/price before opening modal
+  setScanMsg('New product! Capturing label...');
+  var video = document.querySelector('#qr-reader video');
+  if(video && video.readyState >= 2 && camActive){
+    var c = document.createElement('canvas');
+    c.width = video.videoWidth;
+    c.height = video.videoHeight;
+    var ctx = c.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+
+    loadTesseract().then(function(){
+      Tesseract.createWorker('eng').then(function(worker){
+        worker.recognize(c).then(function(result){
+          worker.terminate();
+          var text = result.data.text;
+          console.log('OCR on scan:', text);
+          var parsed = parseOCR(text);
+          var name = parsed.name || '';
+          var price = parsed.price !== null ? parsed.price.toFixed(2) : '';
+          openPM(code, false, name, price);
+          if(parsed.name || parsed.price !== null){
+            toast('Label captured! Review and save.');
+          }
+        }).catch(function(err){
+          console.error('OCR error:', err);
+          openPM(code, false, '', '');
+        });
+      });
+    }).catch(function(err){
+      console.error('Tesseract load error:', err);
+      openPM(code, false, '', '');
+    });
   } else {
-    // Known product — add directly
-    addToCart(code, p.name, p.price);
-    showLastScanned(p.name, p.price, code);
-    toast('✓ Added: ' + p.name);
+    // No camera frame available, open blank modal
+    openPM(code, false, '', '');
   }
 }
 
@@ -649,13 +723,9 @@ function openPM(code, edit, name, price){
   document.getElementById('mProdPrice').value = price;
   document.getElementById('mProdSaveBtn').textContent = edit ? 'Update Product' : 'Save & Add to Cart';
   document.getElementById('ocrBox').style.display = edit ? 'none' : 'flex';
-  document.getElementById('ocrStatus').textContent = !edit && camActive ? 'Auto-capturing label...' : 'Camera not running. Use Photo option or start camera first.';
+  document.getElementById('ocrStatus').textContent = name || price ? 'Label captured from scan' : 'Camera not running. Use Photo option or start camera first.';
   document.getElementById('mProduct').classList.remove('hidden');
   setTimeout(function(){ document.getElementById('mProdName').focus(); }, 300);
-  // Auto-capture label for new products after a brief delay
-  if(!edit && camActive){
-    setTimeout(function(){ captureLabel(); }, 600);
-  }
 }
 function closePM(){ document.getElementById('mProduct').classList.add('hidden'); }
 function savePM(){
@@ -1109,7 +1179,7 @@ renderHome();
 <div id="versionFooter" style="position:fixed;bottom:0;left:0;right:0;text-align:center;padding:4px;font-size:10px;color:var(--muted);background:var(--bg);border-top:1px solid var(--border);z-index:50;pointer-events:none;"></div>
 <script>
 (function(){
-  var v = 'v1.1.4';
+  var v = 'v1.1.5';
   var b = document.querySelector('.bnav');
   var f = document.getElementById('versionFooter');
   if(f) f.textContent = 'GroceryScan ' + v + ' · ' + new Date().toLocaleDateString('en-PH',{month:'short',day:'numeric'});
