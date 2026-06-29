@@ -5,7 +5,7 @@ Single HTML file — no install, no build step, no backend.
 
 ---
 
-## How to test WITHOUT uploading to Netlify
+## How to test WITHOUT uploading to Cloudflare
 
 The camera requires **HTTPS**. Here are free ways to get HTTPS locally:
 
@@ -40,11 +40,12 @@ Then open `https://YOUR_LOCAL_IP:8443` on your phone (accept the security warnin
 1. Push this repo to GitHub
 2. Go to repo Settings → Pages → Source: main branch
 3. Your app lives at `https://yourusername.github.io/groceryscan`
-4. Every `git push` auto-deploys — **no Netlify needed**
+4. Every `git push` auto-deploys
 
-### Option D — Netlify (current setup)
-Drop `index.html` into the Netlify Deploys tab.  
-Free tier gives 100GB bandwidth/month and 300 build minutes — plenty for personal use.
+### Option D — Cloudflare Pages (current setup)
+1. Connect your GitHub repo to [Cloudflare Pages](https://pages.cloudflare.com/)
+2. Build settings: Framework preset = **None**, Build command = leave blank, Build output directory = `/`
+3. Cloudflare deploys automatically on every `git push` — **HTTPS included**
 
 ---
 
@@ -85,3 +86,12 @@ git commit -m "v1.0.1 — describe what changed"
 git remote add origin https://github.com/yourname/groceryscan.git
 git push -u origin main
 ```
+
+---
+
+## How to deploy updates
+
+1. Make changes to `index.html`
+2. Commit: `git add . && git commit -m "vX.X.X — description"`
+3. Push to GitHub: `git push`
+4. Cloudflare Pages auto-deploys the update within seconds

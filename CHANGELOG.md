@@ -27,7 +27,7 @@ Format: `[version] YYYY-MM-DD — description`
 
 ### ✅ What's working
 - Barcode / QR code scanner using `html5-qrcode` library (Android Chrome compatible)
-- Camera requires **HTTPS** — works via Netlify URL, not local file
+- Camera requires **HTTPS** — works via any HTTPS host (Cloudflare Pages, GitHub Pages, ngrok), not via local file
 - Manual barcode entry fallback (no camera needed)
 - Product database saved in browser localStorage — scan once, remembered forever
 - Inline product editing — tap price badge or ✏️ to edit name/price without leaving the screen
@@ -92,5 +92,4 @@ Format: `[version] YYYY-MM-DD — description`
 
 1. Make changes to `index.html`
 2. Commit: `git add . && git commit -m "vX.X.X — description"`
-3. Drag `index.html` to Netlify **Deploys** tab
-4. App updates automatically for all users within seconds
+3. Push to GitHub (Cloudflare Pages auto-deploys on every push)

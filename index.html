@@ -324,7 +324,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
       <div id="qr-reader"></div>
       <div id="scanPlaceholder" class="scan-placeholder">
         📷<br>Tap <strong>Start Camera</strong> below<br>
-        <span style="font-size:11px;">Camera requires HTTPS — works on Netlify</span>
+        <span style="font-size:11px;">Camera requires HTTPS — works on any HTTPS host</span>
       </div>
       <!-- Scan frame overlay shown when camera is active -->
       <div class="scan-frame-overlay" id="scanFrameOverlay" style="display:none;">
@@ -501,7 +501,7 @@ function startCamera(){
     } else if(e.indexOf('notfound') !== -1){
       msg = '⚠️ No camera found on this device.';
     } else if(e.indexOf('https') !== -1 || e.indexOf('secure') !== -1){
-      msg = '⚠️ Camera requires HTTPS. Open via your Netlify URL, not a local file.';
+      msg = '⚠️ Camera requires HTTPS. Open via your Cloudflare Pages URL, not a local file.';
     }
     setScanMsg(msg);
     console.error('Camera error:', err);
