@@ -5,6 +5,16 @@ Format: `[version] YYYY-MM-DD — description`
 
 ---
 
+## [1.1.3] 2026-06-29 — Rear camera fix (take 2)
+
+### ✅ Fixed
+- **Removed `exact: 'environment'` constraint** — this was causing `overconstrained` errors on Android, which fell back to the front camera
+- **Better rear camera detection** — now searches for "back", "rear", or "environment" in camera labels; if no match, uses the last camera in the list (typically rear on dual-camera phones)
+- **Uses device ID directly** — when `getCameras()` succeeds, passes the actual camera device ID string to `start()`, which is more reliable than `facingMode` constraints
+- **Removed buggy retry loop** — the old `overconstrained` catch block created a new scanner instance without cleanup, causing DOM conflicts
+
+---
+
 ## [1.1.2] 2026-06-29 — Camera fix + Auto-capture
 
 ### ✅ Fixed
