@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0f1f0f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="GroceryScan">
+<title>GroceryScan</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- Barcode scanner library — most reliable for Android Chrome -->
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+<style>
+:root {
+  --bg:#0f1f0f; --surface:#172417; --surface2:#1e321e;
+  --accent:#7dde7d; --accent2:#b8f0a0;
+  --warn:#f0c060; --danger:#f07070;
+  --text:#e8f5e8; --muted:#7a9e7a; --border:#2a3e2a;
+  --r:16px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;overflow:hidden;}
+
+/* ── SCREENS ── */
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;overflow:hidden;transition:transform .3s cubic-bezier(.4,0,.2,1),opacity .3s;}
+.screen.hidden{transform:translateX(100%);opacity:0;pointer-events:none;}
+
+/* ── HEADER ── */
+.hdr{padding:16px 20px 12px;display:flex;align-items:center;gap:12px;background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0;}
+.hdr h1{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--accent);letter-spacing:-.5px;flex:1;}
+.sub{font-size:11px;color:var(--muted);}
+
+/* ── NAV ── */
+.bnav{display:flex;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;}
+.nb{flex:1;padding:10px 0 12px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;color:var(--muted);font-size:10px;font-weight:500;border:none;background:none;transition:color .2s;}
+.nb.on{color:var(--accent);}
+.nb .ic{font-size:22px;}
+
+/* ── CONTENT ── */
+.content{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;}
+
+/* ── CARDS ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;}
+.ctitle{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;}
+
+/* ── BUTTONS ── */
+.btn{padding:10px 20px;border-radius:10px;border:none;cursor:pointer;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;transition:transform .1s;}
+.btn:active{transform:scale(.97);}
+.bp{background:var(--accent);color:#0f1f0f;}
+.bg{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+.bfull{width:100%;}
+.bsm{padding:7px 14px;border-radius:8px;border:none;cursor:pointer;font-family:'Syne',sans-serif;font-weight:700;font-size:12px;}
+.bsmp{background:var(--accent);color:#0f1f0f;}
+.bsmg{background:var(--surface);color:var(--muted);border:1px solid var(--border);}
+.bsmc{background:rgba(125,222,125,.15);color:var(--accent);border:1px solid rgba(125,222,125,.3);}
+
+/* ── FORMS ── */
+.fg{display:flex;flex-direction:column;gap:6px;}
+.fl{font-size:12px;color:var(--muted);font-weight:500;}
+.fi,.bi,.si{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--text);font-size:14px;font-family:'DM Sans',sans-serif;outline:none;}
+.fi:focus,.bi:focus,.si:focus{border-color:var(--accent);}
+.bi{flex:1;}.si{width:100%;}
+.bc{font-family:monospace;font-size:12px;color:var(--muted);background:var(--surface2);border:1px dashed var(--border);border-radius:8px;padding:8px 12px;word-break:break-all;}
+
+/* ── BUDGET RING ── */
+.ring-svg{transform:rotate(-90deg);}
+.rb{fill:none;stroke:var(--border);stroke-width:8;}
+.rf{fill:none;stroke-width:8;stroke-linecap:round;transition:stroke-dashoffset .6s,stroke .3s;}
+.rc{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;}
+.ra{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;}
+.rl{font-size:11px;color:var(--muted);}
+.rw{position:relative;display:inline-block;}
+
+/* ── PILLS ── */
+.pills{display:flex;gap:8px;}
+.pill{background:var(--surface2);border:1px solid var(--border);border-radius:100px;padding:6px 14px;font-size:11px;display:flex;flex-direction:column;align-items:center;flex:1;}
+.pv{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--accent);}
+
+/* ── SCANNER ── */
+.scan-box{background:#000;border-radius:var(--r);overflow:hidden;position:relative;min-height:220px;display:flex;align-items:center;justify-content:center;}
+#qr-reader{width:100%;}
+/* Hide html5-qrcode default chrome buttons/text */
+#qr-reader__header_message,#qr-reader__status_span,
+#qr-reader__dashboard,#qr-reader__filescan_input,
+#qr-reader__camera_selection_container{display:none!important;}
+#qr-reader video{width:100%!important;max-height:240px;object-fit:cover;}
+#qr-reader img{display:none!important;}
+#qr-reader canvas{display:none!important;}
+.scan-placeholder{color:var(--muted);font-size:13px;text-align:center;padding:40px 20px;line-height:1.8;}
+.scan-frame-overlay{position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center;}
+.sframe{width:210px;height:130px;border:2px solid var(--accent);border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,.45);animation:fpulse 2s infinite;}
+@keyframes fpulse{0%,100%{border-color:var(--accent);}50%{border-color:var(--accent2);}}
+.manualbtn{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;background:var(--surface2);border:1px dashed var(--border);border-radius:10px;cursor:pointer;color:var(--muted);font-size:13px;}
+
+/* ── TOGGLE ── */
+.trow{display:flex;align-items:center;justify-content:space-between;padding:8px 0;}
+.tog{position:relative;width:44px;height:26px;flex-shrink:0;}
+.tog input{opacity:0;width:0;height:0;}
+.tslider{position:absolute;inset:0;background:var(--surface2);border:1px solid var(--border);border-radius:100px;cursor:pointer;transition:.2s;}
+.tslider:before{content:'';position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:var(--muted);border-radius:50%;transition:.2s;}
+.tog input:checked+.tslider{background:rgba(125,222,125,.2);border-color:var(--accent);}
+.tog input:checked+.tslider:before{transform:translateX(18px);background:var(--accent);}
+
+/* ── CART ── */
+.ci{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
+.ci:last-child{border-bottom:none;}
+.cii{flex:1;min-width:0;}
+.cin{font-weight:500;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cis{font-size:11px;color:var(--muted);}
+.ciq{display:flex;align-items:center;gap:6px;}
+.qb{width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;}
+.qn{font-family:'Syne',sans-serif;font-weight:700;min-width:20px;text-align:center;}
+.cip{font-family:'Syne',sans-serif;font-weight:700;color:var(--accent);min-width:64px;text-align:right;font-size:14px;}
+.cdel{width:28px;height:28px;border-radius:8px;border:none;background:transparent;color:var(--danger);font-size:18px;cursor:pointer;line-height:1;}
+.tbar{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;margin:0 16px 8px;}
+.tl{font-size:13px;color:var(--muted);}
+.ta{font-family:'Syne',sans-serif;font-weight:800;font-size:24px;color:var(--accent);}
+
+/* ── PRODUCTS ── */
+.pr{display:flex;flex-direction:column;padding:12px 0;border-bottom:1px solid var(--border);}
+.pr:last-child{border-bottom:none;}
+.prt{display:flex;align-items:center;gap:8px;}
+.pname{font-weight:500;font-size:14px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;}
+.pcode{font-size:10px;color:var(--muted);font-family:monospace;}
+.pprice{font-family:'Syne',sans-serif;font-weight:800;font-size:14px;color:var(--accent2);background:rgba(125,222,125,.1);border:1px solid rgba(125,222,125,.25);border-radius:8px;padding:4px 10px;cursor:pointer;white-space:nowrap;}
+.pedit{display:none;flex-direction:column;gap:8px;background:var(--surface2);border-radius:10px;padding:12px;border:1px solid var(--accent);margin-top:8px;}
+.pedit.open{display:flex;}
+.irow{display:flex;gap:8px;align-items:center;}
+.ilabel{font-size:11px;color:var(--muted);min-width:38px;}
+.iinput{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:14px;font-family:'DM Sans',sans-serif;outline:none;}
+.iinput:focus{border-color:var(--accent);}
+
+/* ── WARN ── */
+.wb{background:rgba(240,192,96,.15);border:1px solid var(--warn);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--warn);}
+.wb.d{background:rgba(240,112,112,.15);border-color:var(--danger);color:var(--danger);}
+.hidden{display:none!important;}
+
+/* ── HISTORY ── */
+.sc{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;}
+.sdate{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;}
+.stotal{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;color:var(--accent);}
+
+/* ── MODALS ── */
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;display:flex;align-items:flex-end;}
+.mo.hidden{display:none;}
+.md{background:var(--surface);border-radius:var(--r) var(--r) 0 0;padding:20px;width:100%;max-height:88vh;overflow-y:auto;border:1px solid var(--border);}
+.mdtitle{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;margin-bottom:16px;}
+.mac{display:flex;gap:8px;margin-top:16px;}
+
+/* ── PRICE CONFIRM ── */
+.pctitle{font-family:'Syne',sans-serif;font-weight:800;font-size:17px;margin-bottom:4px;}
+.pcsub{font-size:13px;color:var(--muted);margin-bottom:14px;}
+.pcmp{display:flex;gap:10px;margin-bottom:16px;align-items:center;}
+.pbox{flex:1;border-radius:12px;padding:14px;text-align:center;}
+.pbox-old{background:rgba(240,112,112,.1);border:1px solid rgba(240,112,112,.3);}
+.pbox-new{background:rgba(125,222,125,.1);border:1px solid rgba(125,222,125,.3);}
+.pblabel{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+.pbval{font-family:'Syne',sans-serif;font-weight:800;font-size:22px;}
+.pbox-old .pbval{color:var(--danger);}
+.pbox-new .pbval{color:var(--accent);}
+.diffbadge{font-size:11px;font-weight:600;border-radius:100px;padding:2px 8px;display:inline-block;margin-top:4px;}
+.dup{background:rgba(240,112,112,.2);color:var(--danger);}
+.ddown{background:rgba(125,222,125,.2);color:var(--accent);}
+.copts{display:flex;flex-direction:column;gap:8px;}
+.copt{border-radius:12px;padding:13px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;border:1px solid var(--border);background:var(--surface2);}
+.copt-icon{font-size:20px;}
+.copt-title{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;}
+.copt-desc{font-size:12px;color:var(--muted);}
+.cg{border-color:rgba(125,222,125,.4);}
+.cy{border-color:rgba(240,192,96,.35);}
+.cr{border-color:rgba(240,112,112,.3);}
+
+/* ── EMPTY ── */
+.empty{text-align:center;padding:40px 20px;color:var(--muted);}
+.eico{font-size:48px;margin-bottom:12px;}
+.etxt{font-size:14px;line-height:1.7;}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--accent);color:#0f1f0f;padding:10px 20px;border-radius:100px;font-weight:700;font-size:13px;opacity:0;transition:all .3s;pointer-events:none;z-index:999;white-space:nowrap;max-width:90vw;text-align:center;}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* ── OCR CAPTURE ── */
+.ocrbox{background:var(--surface2);border:1px dashed var(--border);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;}
+.ocrbtns{display:flex;gap:8px;}
+.ocrstatus{font-size:12px;color:var(--muted);min-height:18px;}
+.ocrtag{display:inline-block;background:rgba(125,222,125,.15);color:var(--accent);border:1px solid rgba(125,222,125,.3);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600;}
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<input type="file" accept="image/*" id="ocrFileInput" style="display:none;" onchange="onOCRFileSelect(this)">
+
+<!-- ══ MODAL: New / Edit Product ══ -->
+<div class="mo hidden" id="mProduct">
+  <div class="md">
+    <div class="mdtitle" id="mProdTitle">New Product Found!</div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="bc" id="mProdCode"></div>
+      <!-- OCR capture for new products -->
+      <div class="ocrbox" id="ocrBox" style="display:none;">
+        <div style="font-size:12px;color:var(--muted);">Auto-fill from label photo</div>
+        <div class="ocrbtns">
+          <button class="btn bg" style="flex:1;font-size:12px;padding:8px;" onclick="captureLabel()">📷 Capture from Camera</button>
+          <button class="btn bg" style="flex:1;font-size:12px;padding:8px;" onclick="document.getElementById('ocrFileInput').click()">🖼️ Photo</button>
+        </div>
+        <div class="ocrstatus" id="ocrStatus"></div>
+      </div>
+      <div class="fg"><label class="fl">Product Name</label><input class="fi" id="mProdName" placeholder="e.g. Tide Powder 500g" autocomplete="off"></div>
+      <div class="fg"><label class="fl">Price (₱)</label><input class="fi" id="mProdPrice" type="number" step="0.01" min="0" placeholder="0.00"></div>
+    </div>
+    <div class="mac">
+      <button class="btn bg" style="flex:1" onclick="closePM()">Cancel</button>
+      <button class="btn bp" style="flex:2" id="mProdSaveBtn" onclick="savePM()">Save &amp; Add to Cart</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: Price Change Confirmation ══ -->
+<div class="mo hidden" id="mConfirm">
+  <div class="md">
+    <div class="pctitle">⚠️ Price Change Detected</div>
+    <div class="pcsub">The price you entered differs from what is saved. What would you like to do?</div>
+    <div style="font-weight:600;font-size:14px;margin-bottom:2px;" id="mCName"></div>
+    <div style="font-size:11px;color:var(--muted);font-family:monospace;margin-bottom:14px;" id="mCCode"></div>
+    <div class="pcmp">
+      <div class="pbox pbox-old"><div class="pblabel">Saved Price</div><div class="pbval" id="mCOld"></div></div>
+      <div style="font-size:18px;color:var(--muted);">→</div>
+      <div class="pbox pbox-new"><div class="pblabel">New Price</div><div class="pbval" id="mCNew"></div><div class="diffbadge" id="mCDiff"></div></div>
+    </div>
+    <div class="copts">
+      <div class="copt cg" onclick="doConfirm('update')"><div class="copt-icon">✅</div><div><div class="copt-title">Update &amp; Save New Price</div><div class="copt-desc">Saves to database, updates cart if item is there</div></div></div>
+      <div class="copt cy" onclick="doConfirm('keep')"><div class="copt-icon">🔒</div><div><div class="copt-title">Keep Saved Price</div><div class="copt-desc">Discard the new price, keep what was saved</div></div></div>
+      <div class="copt cr" onclick="doConfirm('cancel')"><div class="copt-icon">✕</div><div><div class="copt-title">Cancel</div><div class="copt-desc">Do not save changes</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: Verify Before Adding ══ -->
+<div class="mo hidden" id="mVerify">
+  <div class="md">
+    <div class="pctitle">Confirm Product</div>
+    <div class="pcsub">Is this the right item and price?</div>
+    <div style="font-size:11px;color:var(--muted);font-family:monospace;margin-bottom:12px;" id="mVCode"></div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Product</div>
+      <div style="font-weight:600;font-size:16px;margin-bottom:12px;" id="mVName"></div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Price</div>
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:26px;color:var(--accent);" id="mVPrice"></div>
+    </div>
+    <div class="copts">
+      <div class="copt cg" onclick="doVerify('add')"><div class="copt-icon">🛒</div><div><div class="copt-title">Yes, Add to Cart</div><div class="copt-desc">Looks correct</div></div></div>
+      <div class="copt cy" onclick="doVerify('edit')"><div class="copt-icon">✏️</div><div><div class="copt-title">Edit First</div><div class="copt-desc">Change name or price before adding</div></div></div>
+      <div class="copt cr" onclick="doVerify('cancel')"><div class="copt-icon">✕</div><div><div class="copt-title">Cancel</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: Manual Barcode ══ -->
+<div class="mo hidden" id="mManual">
+  <div class="md">
+    <div class="mdtitle">Enter Barcode Manually</div>
+    <div class="fg"><label class="fl">Barcode or QR value</label><input class="fi" id="mManualVal" placeholder="e.g. 4800016030109" autocomplete="off" inputmode="text"></div>
+    <div class="mac">
+      <button class="btn bg" style="flex:1" onclick="closeManual()">Cancel</button>
+      <button class="btn bp" style="flex:2" onclick="submitManual()">Lookup</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     SCREEN: HOME
+════════════════════════════════════ -->
+<div class="screen" id="s-home">
+  <div class="hdr">
+    <div style="flex:1"><h1>🛒 GroceryScan</h1><div class="sub" id="homeDate"></div></div>
+    <button class="btn bp" onclick="newTrip()" style="font-size:12px;padding:8px 14px;">+ New Trip</button>
+  </div>
+  <div class="content">
+    <div class="card">
+      <div class="ctitle">Budget Overview</div>
+      <div style="display:flex;flex-direction:column;align-items:center;">
+        <div class="rw">
+          <svg class="ring-svg" width="140" height="140" viewBox="0 0 140 140">
+            <circle class="rb" cx="70" cy="70" r="58"/>
+            <circle class="rf" id="ringFill" cx="70" cy="70" r="58" stroke-dasharray="364" stroke-dashoffset="364" stroke="var(--accent)"/>
+          </svg>
+          <div class="rc"><div class="ra" id="ringSpent">₱0</div><div class="rl">of ₱<span id="ringBudget">0</span></div></div>
+        </div>
+      </div>
+      <div id="budgetWarn" class="wb hidden" style="margin-top:12px;"></div>
+      <div style="margin-top:14px;">
+        <div class="ctitle">Set Budget</div>
+        <div style="display:flex;gap:8px;"><input class="bi" id="budgetInput" type="number" placeholder="e.g. 1000" step="50" min="0"><button class="btn bp" onclick="setBudget()">Set</button></div>
+      </div>
+    </div>
+    <div class="pills">
+      <div class="pill"><div class="pv" id="pCart">0</div><div style="font-size:11px;color:var(--muted);">In Cart</div></div>
+      <div class="pill"><div class="pv" id="pProds">0</div><div style="font-size:11px;color:var(--muted);">Saved</div></div>
+      <div class="pill"><div class="pv" id="pTrips">0</div><div style="font-size:11px;color:var(--muted);">Trips</div></div>
+    </div>
+    <button class="btn bp bfull" style="padding:16px;font-size:16px;" onclick="goTo('scan')">📷 Scan a Product</button>
+  </div>
+  <div class="bnav">
+    <button class="nb on" onclick="goTo('home')"><span class="ic">🏠</span>Home</button>
+    <button class="nb" onclick="goTo('scan')"><span class="ic">📷</span>Scan</button>
+    <button class="nb" onclick="goTo('cart')"><span class="ic">🛒</span>Cart</button>
+    <button class="nb" onclick="goTo('products')"><span class="ic">📦</span>Products</button>
+    <button class="nb" onclick="goTo('history')"><span class="ic">📋</span>History</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     SCREEN: SCAN
+════════════════════════════════════ -->
+<div class="screen hidden" id="s-scan">
+  <div class="hdr"><h1>Scan Product</h1></div>
+  <div class="content">
+
+    <!-- Camera box -->
+    <div class="scan-box">
+      <div id="qr-reader"></div>
+      <div id="scanPlaceholder" class="scan-placeholder">
+        📷<br>Tap <strong>Start Camera</strong> below<br>
+        <span style="font-size:11px;">Camera requires HTTPS — works on Netlify</span>
+      </div>
+      <!-- Scan frame overlay shown when camera is active -->
+      <div class="scan-frame-overlay" id="scanFrameOverlay" style="display:none;">
+        <div class="sframe"></div>
+      </div>
+    </div>
+
+    <div id="scanMsg" style="text-align:center;color:var(--muted);font-size:13px;line-height:1.6;min-height:36px;"></div>
+
+    <!-- Start / Retry button -->
+    <button class="btn bp bfull" id="startCamBtn" onclick="startCamera()">▶ Start Camera</button>
+    <button class="btn bg bfull hidden" id="stopCamBtn" onclick="stopCamera()">⏹ Stop Camera</button>
+
+    <!-- Manual entry -->
+    <div class="manualbtn" onclick="openManual()">⌨️ Enter barcode manually instead</div>
+
+    <!-- Confirm toggle -->
+    <div class="card" style="padding:12px 16px;">
+      <div class="trow">
+        <div><div style="font-size:13px;font-weight:500;">Always confirm before adding</div><div style="font-size:11px;color:var(--muted);">Review each scan before it enters cart</div></div>
+        <label class="tog"><input type="checkbox" id="verifyToggle" onchange="toggleVerify()"><span class="tslider"></span></label>
+      </div>
+    </div>
+
+    <!-- Last scanned -->
+    <div class="card hidden" id="lastScanned">
+      <div class="ctitle">Last Scanned</div>
+      <div id="lastScannedBody"></div>
+    </div>
+
+  </div>
+  <div class="bnav">
+    <button class="nb" onclick="goTo('home')"><span class="ic">🏠</span>Home</button>
+    <button class="nb on" onclick="goTo('scan')"><span class="ic">📷</span>Scan</button>
+    <button class="nb" onclick="goTo('cart')"><span class="ic">🛒</span>Cart</button>
+    <button class="nb" onclick="goTo('products')"><span class="ic">📦</span>Products</button>
+    <button class="nb" onclick="goTo('history')"><span class="ic">📋</span>History</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     SCREEN: CART
+════════════════════════════════════ -->
+<div class="screen hidden" id="s-cart">
+  <div class="hdr">
+    <h1>Current Cart</h1>
+    <button class="btn bg" style="font-size:12px;padding:6px 12px;" onclick="clearCart()">Clear</button>
+  </div>
+  <div id="cartWarn" class="wb hidden" style="margin:8px 16px 0;flex-shrink:0;"></div>
+  <div class="content" id="cartContent"></div>
+  <div class="tbar">
+    <div><div class="tl">Session Total</div><div class="ta" id="cartTotal">₱0.00</div></div>
+    <button class="btn bp" onclick="checkout()">Checkout ✓</button>
+  </div>
+  <div class="bnav">
+    <button class="nb" onclick="goTo('home')"><span class="ic">🏠</span>Home</button>
+    <button class="nb" onclick="goTo('scan')"><span class="ic">📷</span>Scan</button>
+    <button class="nb on" onclick="goTo('cart')"><span class="ic">🛒</span>Cart</button>
+    <button class="nb" onclick="goTo('products')"><span class="ic">📦</span>Products</button>
+    <button class="nb" onclick="goTo('history')"><span class="ic">📋</span>History</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     SCREEN: PRODUCTS
+════════════════════════════════════ -->
+<div class="screen hidden" id="s-products">
+  <div class="hdr"><h1>Saved Products</h1></div>
+  <div style="padding:12px 16px 0;flex-shrink:0;">
+    <input class="si" id="prodSearch" placeholder="🔍 Search by name or barcode..." oninput="renderProducts()">
+  </div>
+  <div class="content" id="prodContent"></div>
+  <div class="bnav">
+    <button class="nb" onclick="goTo('home')"><span class="ic">🏠</span>Home</button>
+    <button class="nb" onclick="goTo('scan')"><span class="ic">📷</span>Scan</button>
+    <button class="nb" onclick="goTo('cart')"><span class="ic">🛒</span>Cart</button>
+    <button class="nb on" onclick="goTo('products')"><span class="ic">📦</span>Products</button>
+    <button class="nb" onclick="goTo('history')"><span class="ic">📋</span>History</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     SCREEN: HISTORY
+════════════════════════════════════ -->
+<div class="screen hidden" id="s-history">
+  <div class="hdr"><h1>Shopping History</h1></div>
+  <div class="content" id="histContent"></div>
+  <div class="bnav">
+    <button class="nb" onclick="goTo('home')"><span class="ic">🏠</span>Home</button>
+    <button class="nb" onclick="goTo('scan')"><span class="ic">📷</span>Scan</button>
+    <button class="nb" onclick="goTo('cart')"><span class="ic">🛒</span>Cart</button>
+    <button class="nb" onclick="goTo('products')"><span class="ic">📦</span>Products</button>
+    <button class="nb on" onclick="goTo('history')"><span class="ic">📋</span>History</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+var S = { budget:0, cart:[], products:{}, history:[], verifyMode:false };
+
+function save(){ try{ localStorage.setItem('gs3', JSON.stringify(S)); }catch(e){} }
+function load(){ try{ var d=localStorage.getItem('gs3'); if(d) S=JSON.parse(d); }catch(e){} }
+load();
+
+// ═══════════════════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════════════════
+function goTo(name){
+  document.querySelectorAll('.screen').forEach(function(s){ s.classList.add('hidden'); });
+  document.getElementById('s-'+name).classList.remove('hidden');
+  // Update all nav buttons across all screens
+  document.querySelectorAll('.nb').forEach(function(b){
+    var fn = b.getAttribute('onclick');
+    b.classList.toggle('on', fn && fn.indexOf("'"+name+"'") !== -1);
+  });
+  if(name !== 'scan') stopCamera();
+  if(name === 'home') renderHome();
+  if(name === 'cart') renderCart();
+  if(name === 'products') renderProducts();
+  if(name === 'history') renderHistory();
+  if(name === 'scan') syncToggle();
+}
+
+// ═══════════════════════════════════════════════════════
+//  SCANNER  (html5-qrcode)
+// ═══════════════════════════════════════════════════════
+var qrScanner = null;
+var camActive = false;
+
+function startCamera(){
+  if(camActive) return;
+  if(typeof Html5Qrcode === 'undefined'){
+    setScanMsg('⚠️ Scanner library not loaded. Check internet connection and refresh the page.');
+    return;
+  }
+
+  setScanMsg('Starting camera...');
+  document.getElementById('startCamBtn').disabled = true;
+  document.getElementById('qr-reader').innerHTML = '';
+
+  qrScanner = new Html5Qrcode('qr-reader');
+  var formats = [];
+  if(typeof Html5QrcodeSupportedFormats !== 'undefined'){
+    formats = [
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.CODE_39
+    ];
+  }
+  qrScanner.start(
+    { facingMode: 'environment' },
+    { fps: 30, qrbox: { width: 260, height: 160 }, aspectRatio: 1.0, videoConstraints: { width: { min: 640, ideal: 1280, max: 1920 }, height: { min: 480, ideal: 720, max: 1080 } }, formatsToSupport: formats },
+    function(code){ onScan(code); },
+    function(){ /* ignore per-frame errors */ }
+  ).then(function(){
+    camActive = true;
+    setScanMsg('Point camera at a barcode or QR code');
+    document.getElementById('scanPlaceholder').style.display = 'none';
+    document.getElementById('scanFrameOverlay').style.display = 'flex';
+    document.getElementById('startCamBtn').classList.add('hidden');
+    document.getElementById('stopCamBtn').classList.remove('hidden');
+  }).catch(function(err){
+    camActive = false;
+    document.getElementById('startCamBtn').disabled = false;
+    var msg = '⚠️ Could not start camera.';
+    var e = String(err).toLowerCase();
+    if(e.indexOf('notallowed') !== -1 || e.indexOf('permission') !== -1){
+      msg = '⚠️ Camera permission denied.\n\nIn Chrome: tap the 🔒 icon in the address bar → Site settings → Camera → Allow → then tap Start Camera again.';
+    } else if(e.indexOf('notfound') !== -1){
+      msg = '⚠️ No camera found on this device.';
+    } else if(e.indexOf('https') !== -1 || e.indexOf('secure') !== -1){
+      msg = '⚠️ Camera requires HTTPS. Open via your Netlify URL, not a local file.';
+    }
+    setScanMsg(msg);
+    console.error('Camera error:', err);
+  });
+}
+
+function stopCamera(){
+  if(qrScanner && camActive){
+    qrScanner.stop().then(function(){
+      qrScanner.clear();
+      qrScanner = null; camActive = false;
+      document.getElementById('qr-reader').innerHTML = '';
+      document.getElementById('scanPlaceholder').style.display = 'flex';
+      document.getElementById('scanFrameOverlay').style.display = 'none';
+      document.getElementById('startCamBtn').classList.remove('hidden');
+      document.getElementById('startCamBtn').disabled = false;
+      document.getElementById('stopCamBtn').classList.add('hidden');
+      setScanMsg('');
+    }).catch(function(){
+      qrScanner=null; camActive=false;
+    });
+  }
+}
+
+function setScanMsg(msg){ document.getElementById('scanMsg').textContent = msg; }
+
+// ── SCAN HANDLER ──
+var _lastCode='', _cooldown=false;
+function onScan(code){
+  if(_cooldown || code === _lastCode) return;
+  _lastCode = code; _cooldown = true;
+  setTimeout(function(){ _cooldown=false; _lastCode=''; }, 1200);
+
+  playBeep();
+
+  var p = S.products[code];
+  if(!p){
+    // Brand new — open add modal
+    openPM(code, false, '', '');
+  } else if(S.verifyMode){
+    // Always-confirm mode
+    openVerify(code, p.name, p.price);
+  } else {
+    // Known product — add directly
+    addToCart(code, p.name, p.price);
+    showLastScanned(p.name, p.price, code);
+    toast('✓ Added: ' + p.name);
+  }
+}
+
+function showLastScanned(name, price, code){
+  document.getElementById('lastScanned').classList.remove('hidden');
+  document.getElementById('lastScannedBody').innerHTML =
+    '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+    '<div><div style="font-weight:600;font-size:15px;">'+esc(name)+'</div>' +
+    '<div style="font-size:11px;color:var(--muted);">'+esc(code)+'</div></div>' +
+    '<div style="font-family:Syne,sans-serif;font-weight:800;font-size:18px;color:var(--accent);">₱'+(+price).toFixed(2)+'</div></div>';
+}
+
+// ═══════════════════════════════════════════════════════
+//  PRODUCT MODAL  (add new / edit existing)
+// ═══════════════════════════════════════════════════════
+var _pmCode='', _pmEdit=false;
+function openPM(code, edit, name, price){
+  _pmCode=code; _pmEdit=edit;
+  document.getElementById('mProdCode').textContent = 'Barcode: ' + code;
+  document.getElementById('mProdTitle').textContent = edit ? 'Edit Product' : '🆕 New Product Found!';
+  document.getElementById('mProdName').value = name;
+  document.getElementById('mProdPrice').value = price;
+  document.getElementById('mProdSaveBtn').textContent = edit ? 'Update Product' : 'Save & Add to Cart';
+  document.getElementById('ocrBox').style.display = edit ? 'none' : 'flex';
+  document.getElementById('ocrStatus').textContent = '';
+  document.getElementById('mProduct').classList.remove('hidden');
+  setTimeout(function(){ document.getElementById('mProdName').focus(); }, 300);
+}
+function closePM(){ document.getElementById('mProduct').classList.add('hidden'); }
+function savePM(){
+  var name = document.getElementById('mProdName').value.trim();
+  var price = parseFloat(document.getElementById('mProdPrice').value);
+  if(!name){ toast('Please enter a product name'); return; }
+  if(isNaN(price) || price < 0){ toast('Please enter a valid price'); return; }
+
+  if(_pmEdit){
+    var oldPrice = S.products[_pmCode] ? S.products[_pmCode].price : null;
+    S.products[_pmCode] = { name:name, price:price };
+    save(); closePM();
+    // If price changed and item is in cart, ask to sync
+    if(oldPrice !== null && Math.abs(oldPrice - price) > 0.001){
+      var inCart = S.cart.some(function(i){ return i.barcode === _pmCode; });
+      if(inCart && confirm('Price changed from ₱'+oldPrice.toFixed(2)+' to ₱'+price.toFixed(2)+'.\nUpdate the price in your current cart too?')){
+        S.cart.forEach(function(i){ if(i.barcode===_pmCode) i.price=price; });
+        save(); renderCart();
+      }
+    }
+    toast('Product updated!'); renderProducts(); renderHome();
+  } else {
+    S.products[_pmCode] = { name:name, price:price };
+    save(); closePM();
+    addToCart(_pmCode, name, price);
+    showLastScanned(name, price, _pmCode);
+    toast('Saved & added: ' + name);
+    renderHome();
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  VERIFY MODAL
+// ═══════════════════════════════════════════════════════
+var _vCode='', _vName='', _vPrice=0;
+function openVerify(code, name, price){
+  _vCode=code; _vName=name; _vPrice=+price;
+  document.getElementById('mVCode').textContent = 'Barcode: '+code;
+  document.getElementById('mVName').textContent = name;
+  document.getElementById('mVPrice').textContent = '₱'+price.toFixed(2);
+  document.getElementById('mVerify').classList.remove('hidden');
+}
+function doVerify(action){
+  document.getElementById('mVerify').classList.add('hidden');
+  if(action==='add'){
+    addToCart(_vCode, _vName, _vPrice);
+    showLastScanned(_vName, _vPrice, _vCode);
+    toast('✓ Added: '+_vName);
+  } else if(action==='edit'){
+    openPM(_vCode, true, _vName, _vPrice);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  PRICE CONFIRM MODAL  (from inline product edit)
+// ═══════════════════════════════════════════════════════
+var _cCode='', _cNewName='', _cOldPrice=0, _cNewPrice=0;
+function openConfirm(code, oldPrice, newPrice, newName){
+  _cCode=code; _cNewName=newName; _cOldPrice=oldPrice; _cNewPrice=newPrice;
+  document.getElementById('mCName').textContent = newName;
+  document.getElementById('mCCode').textContent = 'Barcode: ' + code;
+  document.getElementById('mCOld').textContent = '₱'+oldPrice.toFixed(2);
+  document.getElementById('mCNew').textContent = '₱'+newPrice.toFixed(2);
+  var diff = newPrice - oldPrice;
+  var pct = oldPrice > 0 ? Math.abs(diff/oldPrice*100).toFixed(1) : '0';
+  var el = document.getElementById('mCDiff');
+  if(diff > 0){ el.textContent='+₱'+diff.toFixed(2)+' ('+pct+'% ▲)'; el.className='diffbadge dup'; }
+  else if(diff < 0){ el.textContent='−₱'+Math.abs(diff).toFixed(2)+' ('+pct+'% ▼)'; el.className='diffbadge ddown'; }
+  else { el.textContent='Same'; el.className='diffbadge'; }
+  document.getElementById('mConfirm').classList.remove('hidden');
+}
+function doConfirm(action){
+  document.getElementById('mConfirm').classList.add('hidden');
+  if(action==='update'){
+    S.products[_cCode] = { name:_cNewName, price:_cNewPrice };
+    S.cart.forEach(function(i){ if(i.barcode===_cCode){ i.name=_cNewName; i.price=_cNewPrice; } });
+    save(); renderProducts(); renderCart(); renderHome();
+    toast('✅ Price updated to ₱'+_cNewPrice.toFixed(2));
+  } else if(action==='keep'){
+    S.products[_cCode].name = _cNewName;
+    S.cart.forEach(function(i){ if(i.barcode===_cCode) i.name=_cNewName; });
+    save(); renderProducts(); renderHome();
+    toast('Name updated, price kept at ₱'+_cOldPrice.toFixed(2));
+  }
+  // cancel: do nothing
+}
+
+// ═══════════════════════════════════════════════════════
+//  MANUAL BARCODE
+// ═══════════════════════════════════════════════════════
+function openManual(){ document.getElementById('mManual').classList.remove('hidden'); document.getElementById('mManualVal').value=''; }
+function closeManual(){ document.getElementById('mManual').classList.add('hidden'); }
+function submitManual(){
+  var c = document.getElementById('mManualVal').value.trim();
+  if(!c){ toast('Enter a barcode value'); return; }
+  closeManual(); onScan(c);
+}
+
+// ═══════════════════════════════════════════════════════
+//  VERIFY TOGGLE
+// ═══════════════════════════════════════════════════════
+function syncToggle(){ document.getElementById('verifyToggle').checked = !!S.verifyMode; }
+function toggleVerify(){ S.verifyMode = document.getElementById('verifyToggle').checked; save(); toast(S.verifyMode ? 'Confirm mode ON' : 'Confirm mode OFF'); }
+
+// ═══════════════════════════════════════════════════════
+//  CART
+// ═══════════════════════════════════════════════════════
+function addToCart(barcode, name, price){
+  var ex = S.cart.find(function(i){ return i.barcode===barcode; });
+  if(ex) ex.qty++; else S.cart.push({ barcode:barcode, name:name, price:+price, qty:1 });
+  save(); renderHome();
+}
+function cartTotal(){ return S.cart.reduce(function(s,i){ return s+i.price*i.qty; }, 0); }
+
+function renderCart(){
+  var total = cartTotal();
+  document.getElementById('cartTotal').textContent = '₱'+total.toFixed(2);
+  var w = document.getElementById('cartWarn');
+  if(S.budget > 0){
+    var pct = total/S.budget;
+    if(pct >= 1){ w.className='wb d'; w.textContent='🚨 Over budget by ₱'+(total-S.budget).toFixed(2)+'!'; w.classList.remove('hidden'); }
+    else if(pct >= 0.8){ w.className='wb'; w.textContent='⚠️ '+Math.round(pct*100)+'% of budget used — ₱'+(S.budget-total).toFixed(2)+' remaining'; w.classList.remove('hidden'); }
+    else w.classList.add('hidden');
+  } else w.classList.add('hidden');
+
+  var el = document.getElementById('cartContent');
+  if(!S.cart.length){
+    el.innerHTML = '<div class="empty"><div class="eico">🛒</div><div class="etxt">Cart is empty.<br>Go to Scan to add products.</div></div>';
+    return;
+  }
+  el.innerHTML = '<div class="card">' + S.cart.map(function(item, i){
+    return '<div class="ci"><div class="cii"><div class="cin">'+esc(item.name)+'</div><div class="cis">₱'+item.price.toFixed(2)+' each</div></div>' +
+      '<div class="ciq"><button class="qb" onclick="cqty('+i+',-1)">−</button><span class="qn">'+item.qty+'</span><button class="qb" onclick="cqty('+i+',1)">+</button></div>' +
+      '<div class="cip">₱'+(item.price*item.qty).toFixed(2)+'</div>' +
+      '<button class="cdel" onclick="crem('+i+')">🗑</button></div>';
+  }).join('') + '</div>';
+}
+function cqty(i,d){ S.cart[i].qty+=d; if(S.cart[i].qty<=0) S.cart.splice(i,1); save(); renderCart(); renderHome(); }
+function crem(i){ S.cart.splice(i,1); save(); renderCart(); renderHome(); }
+function clearCart(){ if(!S.cart.length) return; if(!confirm('Clear all cart items?')) return; S.cart=[]; save(); renderCart(); renderHome(); }
+function checkout(){
+  if(!S.cart.length){ toast('Cart is empty'); return; }
+  S.history.unshift({ date: new Date().toLocaleString('en-PH',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}), items: S.cart.map(function(i){ return {barcode:i.barcode,name:i.name,price:i.price,qty:i.qty}; }), total: cartTotal() });
+  S.cart=[]; save(); toast('✓ Checked out!'); goTo('history');
+}
+
+// ═══════════════════════════════════════════════════════
+//  PRODUCTS  (inline edit)
+// ═══════════════════════════════════════════════════════
+var openProd = null;
+function renderProducts(){
+  var q = (document.getElementById('prodSearch').value||'').toLowerCase();
+  var keys = Object.keys(S.products).filter(function(c){
+    var p = S.products[c];
+    return !q || p.name.toLowerCase().indexOf(q)!==-1 || c.indexOf(q)!==-1;
+  }).sort(function(a,b){ return S.products[a].name.localeCompare(S.products[b].name); });
+
+  var el = document.getElementById('prodContent');
+  if(!keys.length){
+    el.innerHTML = '<div class="empty"><div class="eico">📦</div><div class="etxt">No saved products yet.<br>Scan any product to add it here.</div></div>';
+    return;
+  }
+
+  var html = '<div style="font-size:12px;color:var(--muted);padding:0 2px;margin-bottom:6px;">Tap the price badge or ✏️ to edit inline</div><div class="card" style="padding:8px 16px;">';
+  keys.forEach(function(code){
+    var p = S.products[code];
+    var isOpen = openProd === code;
+    html += '<div class="pr">' +
+      '<div class="prt">' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div class="pname" onclick="togglePE(\''+esc(code)+'\')">'+esc(p.name)+'</div>' +
+          '<div class="pcode">'+esc(code)+'</div>' +
+        '</div>' +
+        '<div class="pprice" onclick="togglePE(\''+esc(code)+'\')">₱'+p.price.toFixed(2)+'</div>' +
+        '<button class="qb" style="margin-left:6px;" onclick="togglePE(\''+esc(code)+'\')">✏️</button>' +
+        '<button class="cdel" onclick="delProd(\''+esc(code)+'\')">🗑</button>' +
+      '</div>' +
+      '<div class="pedit'+(isOpen?' open':'')+'">'+
+        '<div class="irow"><span class="ilabel">Name</span><input class="iinput" id="en-'+esc(code)+'" value="'+esc(p.name)+'"></div>'+
+        '<div class="irow"><span class="ilabel">Price</span><input class="iinput" id="ep-'+esc(code)+'" type="number" step="0.01" min="0" value="'+p.price+'" style="max-width:130px;"></div>'+
+        '<div style="display:flex;gap:8px;margin-top:4px;">'+
+          '<button class="bsm bsmp" onclick="savePE(\''+esc(code)+'\')">Save Changes</button>'+
+          '<button class="bsm bsmg" onclick="closePE()">Cancel</button>'+
+          '<button class="bsm bsmc" onclick="addFromList(\''+esc(code)+'\')">+ Add to Cart</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
+  if(openProd){ setTimeout(function(){ var n=document.getElementById('en-'+openProd); if(n){ n.focus(); n.select(); } }, 60); }
+}
+function togglePE(code){ openProd = (openProd===code) ? null : code; renderProducts(); }
+function closePE(){ openProd=null; renderProducts(); }
+function savePE(code){
+  var ne = document.getElementById('en-'+code);
+  var pe = document.getElementById('ep-'+code);
+  if(!ne||!pe) return;
+  var name = ne.value.trim();
+  var newPrice = parseFloat(pe.value);
+  if(!name){ toast('Name cannot be empty'); return; }
+  if(isNaN(newPrice)||newPrice<0){ toast('Enter a valid price'); return; }
+  var old = S.products[code];
+  var pc = old && Math.abs(old.price - newPrice) > 0.001;
+  var nc = old && old.name !== name;
+  if(!pc && !nc){ toast('No changes made'); closePE(); return; }
+  if(pc){
+    closePE();
+    openConfirm(code, old.price, newPrice, name);
+  } else {
+    S.products[code].name = name;
+    S.cart.forEach(function(i){ if(i.barcode===code) i.name=name; });
+    save(); closePE(); renderHome(); toast('Name updated!');
+  }
+}
+function addFromList(code){ var p=S.products[code]; if(!p) return; closePE(); addToCart(code,p.name,p.price); toast('Added: '+p.name); goTo('cart'); }
+function delProd(code){ if(!confirm('Delete "'+S.products[code].name+'" from database?')) return; delete S.products[code]; save(); renderProducts(); renderHome(); }
+
+// ═══════════════════════════════════════════════════════
+//  HISTORY
+// ═══════════════════════════════════════════════════════
+function renderHistory(){
+  var el = document.getElementById('histContent');
+  if(!S.history.length){
+    el.innerHTML = '<div class="empty"><div class="eico">📋</div><div class="etxt">No shopping history yet.<br>Complete a checkout to see it here.</div></div>';
+    return;
+  }
+  el.innerHTML = S.history.map(function(s, si){
+    var count = s.items.reduce(function(a,i){ return a+i.qty; },0);
+    return '<div class="sc">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">' +
+        '<div><div class="sdate">'+s.date+'</div><div style="font-size:12px;color:var(--muted);">'+count+' item(s)</div></div>' +
+        '<div style="display:flex;align-items:center;gap:8px;"><div class="stotal">₱'+s.total.toFixed(2)+'</div>' +
+        '<button class="cdel" onclick="delTrip('+si+')">🗑</button></div>' +
+      '</div>' +
+      '<details><summary style="cursor:pointer;font-size:12px;color:var(--muted);">View items</summary>' +
+        '<div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;">' +
+          s.items.map(function(i){ return '<div style="display:flex;justify-content:space-between;font-size:13px;"><span>'+esc(i.name)+' <span style="color:var(--muted);">×'+i.qty+'</span></span><span style="color:var(--accent);">₱'+(i.price*i.qty).toFixed(2)+'</span></div>'; }).join('') +
+        '</div></details></div>';
+  }).join('');
+}
+function delTrip(i){ if(!confirm('Delete this shopping trip?')) return; S.history.splice(i,1); save(); renderHistory(); renderHome(); }
+
+// ═══════════════════════════════════════════════════════
+//  HOME
+// ═══════════════════════════════════════════════════════
+function renderHome(){
+  document.getElementById('homeDate').textContent = new Date().toLocaleDateString('en-PH',{weekday:'long',month:'long',day:'numeric'});
+  var total=cartTotal(), budget=S.budget, circ=364;
+  document.getElementById('ringSpent').textContent = '₱'+total.toFixed(0);
+  document.getElementById('ringBudget').textContent = budget.toFixed(0);
+  var rf = document.getElementById('ringFill');
+  if(budget > 0){
+    var pct = Math.min(total/budget, 1);
+    rf.style.strokeDashoffset = circ-(circ*pct);
+    rf.style.stroke = pct>=1 ? 'var(--danger)' : pct>=.8 ? 'var(--warn)' : 'var(--accent)';
+    var wb = document.getElementById('budgetWarn');
+    if(pct>=1){ wb.className='wb d'; wb.textContent='🚨 Over budget!'; wb.classList.remove('hidden'); }
+    else if(pct>=.8){ wb.className='wb'; wb.textContent='⚠️ '+Math.round(pct*100)+'% of budget used'; wb.classList.remove('hidden'); }
+    else wb.classList.add('hidden');
+  } else {
+    rf.style.strokeDashoffset = circ;
+    rf.style.stroke = 'var(--accent)';
+    document.getElementById('budgetWarn').classList.add('hidden');
+  }
+  document.getElementById('pCart').textContent = S.cart.reduce(function(s,i){ return s+i.qty; },0);
+  document.getElementById('pProds').textContent = Object.keys(S.products).length;
+  document.getElementById('pTrips').textContent = S.history.length;
+  if(budget > 0) document.getElementById('budgetInput').value = budget;
+}
+function setBudget(){ var v=parseFloat(document.getElementById('budgetInput').value); if(isNaN(v)||v<0){toast('Enter a valid amount');return;} S.budget=v; save(); renderHome(); toast('Budget set to ₱'+v.toFixed(2)); }
+function newTrip(){ if(S.cart.length>0){if(!confirm('Start a new trip? Current cart will be cleared.'))return; S.cart=[];} save(); renderHome(); goTo('scan'); }
+
+// ═══════════════════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════════════════
+function esc(s){ return String(s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+var _tt;
+function toast(msg){ var t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(_tt); _tt=setTimeout(function(){ t.classList.remove('show'); },2300); }
+
+// ═══════════════════════════════════════════════════════
+//  AUDIO BEEP
+// ═══════════════════════════════════════════════════════
+function playBeep(){
+  try{
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    osc.type = 'sine';
+    gain.gain.value = 0.12;
+    osc.start();
+    setTimeout(function(){ osc.stop(); ctx.close(); }, 120);
+  }catch(e){}
+}
+
+// ═══════════════════════════════════════════════════════
+//  OCR LABEL CAPTURE
+// ═══════════════════════════════════════════════════════
+var tesseractLoaded = false;
+var tesseractLoading = false;
+
+function loadTesseract(){
+  return new Promise(function(resolve, reject){
+    if(tesseractLoaded){ resolve(); return; }
+    if(tesseractLoading){ setTimeout(function(){ loadTesseract().then(resolve).catch(reject); }, 500); return; }
+    tesseractLoading = true;
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js';
+    s.onload = function(){ tesseractLoaded = true; tesseractLoading = false; resolve(); };
+    s.onerror = function(){ tesseractLoading = false; reject('Failed to load OCR engine'); };
+    document.head.appendChild(s);
+  });
+}
+
+function captureLabel(){
+  var status = document.getElementById('ocrStatus');
+  status.textContent = 'Loading OCR engine (~10MB, first time only)...';
+  loadTesseract().then(function(){
+    status.textContent = 'Capturing frame...';
+    var video = document.querySelector('#qr-reader video');
+    if(!video || video.readyState < 2){
+      status.textContent = 'Camera not active. Start camera first or use Photo option.';
+      return;
+    }
+    var c = document.createElement('canvas');
+    c.width = video.videoWidth;
+    c.height = video.videoHeight;
+    var ctx = c.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    runOCR(c, status);
+  }).catch(function(err){ status.textContent = 'Error: ' + err; });
+}
+
+function onOCRFileSelect(input){
+  var file = input.files[0];
+  if(!file) return;
+  var status = document.getElementById('ocrStatus');
+  status.textContent = 'Loading OCR engine...';
+  loadTesseract().then(function(){
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function(){
+      var c = document.createElement('canvas');
+      c.width = img.width;
+      c.height = img.height;
+      var ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      runOCR(c, status);
+    };
+    img.src = url;
+  }).catch(function(err){ status.textContent = 'Error: ' + err; });
+}
+
+function runOCR(canvas, statusEl){
+  statusEl.textContent = 'Reading label... (5-10s on mobile)';
+  Tesseract.createWorker('eng').then(function(worker){
+    worker.recognize(canvas).then(function(result){
+      worker.terminate().then(function(){
+        var text = result.data.text;
+        console.log('OCR text:', text);
+        var parsed = parseOCR(text);
+        var msgs = [];
+        if(parsed.name){
+          document.getElementById('mProdName').value = parsed.name;
+          msgs.push('Name: "' + parsed.name + '"');
+        }
+        if(parsed.price !== null){
+          document.getElementById('mProdPrice').value = parsed.price.toFixed(2);
+          msgs.push('Price: ₱' + parsed.price.toFixed(2));
+        }
+        if(msgs.length){
+          statusEl.innerHTML = '<span class="ocrtag">Detected</span> ' + msgs.join(' · ');
+          toast('Label captured! Review and save.');
+        } else {
+          statusEl.textContent = 'Could not read name or price. Try clearer photo or type manually.';
+        }
+      });
+    });
+  }).catch(function(err){
+    statusEl.textContent = 'OCR failed: ' + err;
+  });
+}
+
+function parseOCR(text){
+  var lines = text.split('\n').map(function(l){ return l.trim(); }).filter(function(l){ return l.length > 2; });
+
+  // ── Price extraction ──
+  var prices = [];
+  lines.forEach(function(line){
+    var matches = line.match(/\d{1,3}(?:,\d{3})*\.\d{2}/g);
+    if(matches){
+      matches.forEach(function(m){
+        var val = parseFloat(m.replace(/,/g, ''));
+        var lower = line.toLowerCase();
+        var isWeight = lower.indexOf('weight') !== -1 || (lower.indexOf('kg') !== -1 && lower.indexOf('price') === -1);
+        var isDate = /\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/.test(line);
+        var isPerKg = lower.indexOf('price/kg') !== -1 || lower.indexOf('/kg') !== -1 || lower.indexOf('per kg') !== -1;
+        var isTotal = lower.indexOf('total') !== -1;
+        prices.push({ val: val, isWeight: isWeight, isDate: isDate, isPerKg: isPerKg, isTotal: isTotal });
+      });
+    }
+  });
+
+  var bestPrice = null;
+  var totalPrice = prices.find(function(p){ return p.isTotal; });
+  if(totalPrice) bestPrice = totalPrice.val;
+  else {
+    var nonPerKg = prices.filter(function(p){ return !p.isPerKg && !p.isWeight && !p.isDate; });
+    if(nonPerKg.length){
+      nonPerKg.sort(function(a,b){ return b.val - a.val; });
+      bestPrice = nonPerKg[0].val;
+    }
+  }
+
+  // ── Name extraction ──
+  var name = null;
+  var nameCandidates = lines.filter(function(line){
+    var lower = line.toLowerCase();
+    if(/^\d+$/.test(line)) return false;
+    if(/\d+\.\d{2}/.test(line) && line.length < 25) return false;
+    if(lower.indexOf('price') !== -1 && lower.indexOf('kg') !== -1) return false;
+    if(lower.indexOf('weight') !== -1) return false;
+    if(lower.indexOf('total') !== -1) return false;
+    if(lower.indexOf('packed') !== -1) return false;
+    if(lower.indexOf('date') !== -1) return false;
+    if(lower.indexOf('supermarket') !== -1) return false;
+    if(/\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/.test(line)) return false;
+    if(!/[a-zA-Z]{2,}/.test(line)) return false;
+    return true;
+  });
+
+  if(nameCandidates.length){
+    nameCandidates.sort(function(a,b){ return b.length - a.length; });
+    name = nameCandidates[0].replace(/\s+/g, ' ').trim();
+    // Title-case
+    name = name.toLowerCase().split(' ').map(function(w){ return w.charAt(0).toUpperCase() + w.slice(1); }).join(' ');
+  }
+
+  return { name: name, price: bestPrice };
+}
+
+// ═══════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════
+renderHome();
+</script>
+</body>
+</html>
