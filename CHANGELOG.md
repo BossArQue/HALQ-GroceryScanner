@@ -5,6 +5,22 @@ Format: `[version] YYYY-MM-DD — description`
 
 ---
 
+## [1.1.2] 2026-06-29 — Camera fix + Auto-capture
+
+### ✅ Fixed
+- **Rear camera selection** — now explicitly enumerates devices and picks the camera with "back" in its label. Falls back to `facingMode: { exact: 'environment' }`, then simple `environment` if overconstrained
+- **Auto-capture on new product** — when the New Product modal opens, OCR auto-runs after 600ms if the camera is still active. No need to tap a button. Button relabeled to "📷 Re-capture" for retries
+
+---
+
+## [1.1.1] 2026-06-29 — Remove Netlify references, update to Cloudflare Pages
+
+### ✅ Changed
+- README: replaced all Netlify deploy instructions with Cloudflare Pages setup
+- index.html: error messages now reference Cloudflare Pages instead of Netlify
+
+---
+
 ## [1.1.0] 2026-06-29 — Scanner Sensitivity + OCR Auto-Capture
 
 ### ✅ What's new

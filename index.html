@@ -201,12 +201,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
       <div class="bc" id="mProdCode"></div>
       <!-- OCR capture for new products -->
       <div class="ocrbox" id="ocrBox" style="display:none;">
-        <div style="font-size:12px;color:var(--muted);">Auto-fill from label photo</div>
+        <div class="ocrstatus" id="ocrStatus">Auto-capturing label...</div>
         <div class="ocrbtns">
-          <button class="btn bg" style="flex:1;font-size:12px;padding:8px;" onclick="captureLabel()">📷 Capture from Camera</button>
+          <button class="btn bg" style="flex:1;font-size:12px;padding:8px;" onclick="captureLabel()">📷 Re-capture</button>
           <button class="btn bg" style="flex:1;font-size:12px;padding:8px;" onclick="document.getElementById('ocrFileInput').click()">🖼️ Photo</button>
         </div>
-        <div class="ocrstatus" id="ocrStatus"></div>
       </div>
       <div class="fg"><label class="fl">Product Name</label><input class="fi" id="mProdName" placeholder="e.g. Tide Powder 500g" autocomplete="off"></div>
       <div class="fg"><label class="fl">Price (₱)</label><input class="fi" id="mProdPrice" type="number" step="0.01" min="0" placeholder="0.00"></div>
@@ -467,7 +466,6 @@ function startCamera(){
   document.getElementById('startCamBtn').disabled = true;
   document.getElementById('qr-reader').innerHTML = '';
 
-  qrScanner = new Html5Qrcode('qr-reader');
   var formats = [];
   if(typeof Html5QrcodeSupportedFormats !== 'undefined'){
     formats = [
@@ -479,9 +477,28 @@ function startCamera(){
       Html5QrcodeSupportedFormats.CODE_39
     ];
   }
+
+  var scanConfig = { fps: 30, qrbox: { width: 260, height: 160 }, aspectRatio: 1.0, videoConstraints: { width: { min: 640, ideal: 1280, max: 1920 }, height: { min: 480, ideal: 720, max: 1080 } }, formatsToSupport: formats };
+
+  // Try to explicitly pick the rear camera by device label
+  if(typeof Html5Qrcode !== 'undefined' && Html5Qrcode.getCameras){
+    Html5Qrcode.getCameras().then(function(devices){
+      var backCam = devices.find(function(d){ return d.label.toLowerCase().indexOf('back') !== -1; });
+      var cameraId = backCam ? backCam.id : { facingMode: { exact: 'environment' } };
+      startScanner(cameraId, scanConfig);
+    }).catch(function(){
+      startScanner({ facingMode: { exact: 'environment' } }, scanConfig);
+    });
+  } else {
+    startScanner({ facingMode: { exact: 'environment' } }, scanConfig);
+  }
+}
+
+function startScanner(cameraId, config){
+  qrScanner = new Html5Qrcode('qr-reader');
   qrScanner.start(
-    { facingMode: 'environment' },
-    { fps: 30, qrbox: { width: 260, height: 160 }, aspectRatio: 1.0, videoConstraints: { width: { min: 640, ideal: 1280, max: 1920 }, height: { min: 480, ideal: 720, max: 1080 } }, formatsToSupport: formats },
+    cameraId,
+    config,
     function(code){ onScan(code); },
     function(){ /* ignore per-frame errors */ }
   ).then(function(){
@@ -502,6 +519,27 @@ function startCamera(){
       msg = '⚠️ No camera found on this device.';
     } else if(e.indexOf('https') !== -1 || e.indexOf('secure') !== -1){
       msg = '⚠️ Camera requires HTTPS. Open via your Cloudflare Pages URL, not a local file.';
+    } else if(e.indexOf('overconstrained') !== -1 || e.indexOf('constraints') !== -1){
+      msg = '⚠️ Rear camera not available. Falling back to default camera...';
+      // Retry with simple constraint
+      qrScanner = new Html5Qrcode('qr-reader');
+      qrScanner.start(
+        { facingMode: 'environment' },
+        config,
+        function(code){ onScan(code); },
+        function(){}
+      ).then(function(){
+        camActive = true;
+        setScanMsg('Point camera at a barcode or QR code');
+        document.getElementById('scanPlaceholder').style.display = 'none';
+        document.getElementById('scanFrameOverlay').style.display = 'flex';
+        document.getElementById('startCamBtn').classList.add('hidden');
+        document.getElementById('stopCamBtn').classList.remove('hidden');
+      }).catch(function(err2){
+        document.getElementById('startCamBtn').disabled = false;
+        setScanMsg('⚠️ Could not start camera: ' + err2);
+      });
+      return;
     }
     setScanMsg(msg);
     console.error('Camera error:', err);
@@ -573,9 +611,13 @@ function openPM(code, edit, name, price){
   document.getElementById('mProdPrice').value = price;
   document.getElementById('mProdSaveBtn').textContent = edit ? 'Update Product' : 'Save & Add to Cart';
   document.getElementById('ocrBox').style.display = edit ? 'none' : 'flex';
-  document.getElementById('ocrStatus').textContent = '';
+  document.getElementById('ocrStatus').textContent = !edit && camActive ? 'Auto-capturing label...' : 'Camera not running. Use Photo option or start camera first.';
   document.getElementById('mProduct').classList.remove('hidden');
   setTimeout(function(){ document.getElementById('mProdName').focus(); }, 300);
+  // Auto-capture label for new products after a brief delay
+  if(!edit && camActive){
+    setTimeout(function(){ captureLabel(); }, 600);
+  }
 }
 function closePM(){ document.getElementById('mProduct').classList.add('hidden'); }
 function savePM(){
@@ -1029,7 +1071,7 @@ renderHome();
 <div id="versionFooter" style="position:fixed;bottom:0;left:0;right:0;text-align:center;padding:4px;font-size:10px;color:var(--muted);background:var(--bg);border-top:1px solid var(--border);z-index:50;pointer-events:none;"></div>
 <script>
 (function(){
-  var v = 'v1.1.0';
+  var v = 'v1.1.2';
   var b = document.querySelector('.bnav');
   var f = document.getElementById('versionFooter');
   if(f) f.textContent = 'GroceryScan ' + v + ' · ' + new Date().toLocaleDateString('en-PH',{month:'short',day:'numeric'});
