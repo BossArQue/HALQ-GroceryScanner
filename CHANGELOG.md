@@ -5,6 +5,15 @@ Format: `[version] YYYY-MM-DD — description`
 
 ---
 
+## [1.1.4] 2026-06-29 — Camera selector + simplified config
+
+### ✅ Fixed
+- **Removed `videoConstraints` and `aspectRatio`** from scanner config — these were interfering with camera selection on Android Chrome, causing the front camera to open
+- **Added camera selector dropdown** — when multiple cameras are detected, a dropdown appears in the Scan screen letting you manually pick which camera to use. Your selection is saved to localStorage and remembered across sessions
+- **Simplified camera detection** — uses `getCameras()` to enumerate devices, then auto-selects by label ("back", "rear", "environment") or falls back to the last device in the list. If you previously selected a camera, that saved ID is used directly
+
+---
+
 ## [1.1.3] 2026-06-29 — Rear camera fix (take 2)
 
 ### ✅ Fixed
