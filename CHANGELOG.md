@@ -5,6 +5,24 @@ Format: `[version] YYYY-MM-DD — description`
 
 ---
 
+## [1.1.0] 2026-06-29 — Scanner Sensitivity + OCR Auto-Capture
+
+### ✅ What's new
+- **OCR label capture** — scan a new product barcode, then tap "📷 Capture from Camera" or "🖼️ Photo" in the New Product modal to auto-read the label and fill in product name & price
+- **Scanner sensitivity boosted** — FPS bumped from 10 → 30, scan box enlarged (260×160), cooldown reduced 2.5s → 1.2s
+- **More barcode formats** — now supports CODE_128, EAN-13, EAN-8, UPC-A, UPC-E, CODE_39
+- **Camera resolution hints** — requests 1280×720 ideal resolution for sharper scans
+- **Audio beep on scan** — short confirmation tone every successful read
+- **Version footer** — shows version and build date at the bottom of every screen
+
+### 🔧 Technical notes
+- Tesseract.js loaded lazily from CDN (~10MB, first capture only)
+- OCR parser filters out dates, weight, per-kg prices, and supermarket names
+- Prefers "Total Price" label, then largest non-per-kg price found
+- No external barcode lookup API (keeps scans fast, offline-friendly)
+
+---
+
 ## [1.0.0] 2026-03-08 — Stable Clean Rebuild
 
 ### ✅ What's working

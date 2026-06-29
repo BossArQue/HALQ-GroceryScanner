@@ -1026,5 +1026,15 @@ function parseOCR(text){
 // ═══════════════════════════════════════════════════════
 renderHome();
 </script>
+<div id="versionFooter" style="position:fixed;bottom:0;left:0;right:0;text-align:center;padding:4px;font-size:10px;color:var(--muted);background:var(--bg);border-top:1px solid var(--border);z-index:50;pointer-events:none;"></div>
+<script>
+(function(){
+  var v = 'v1.1.0';
+  var b = document.querySelector('.bnav');
+  var f = document.getElementById('versionFooter');
+  if(f) f.textContent = 'GroceryScan ' + v + ' · ' + new Date().toLocaleDateString('en-PH',{month:'short',day:'numeric'});
+  if(b && f){ var h = b.offsetHeight; f.style.bottom = h + 'px'; }
+})();
+</script>
 </body>
 </html>
