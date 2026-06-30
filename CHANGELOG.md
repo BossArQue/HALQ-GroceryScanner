@@ -5,6 +5,23 @@ Format: `[version] YYYY-MM-DD — description`
 
 ---
 
+## [1.2.2] 2026-06-29 — Image preprocessing + Tesseract whitelist for better OCR
+
+### ✅ Fixed
+- **Added `preprocessForOCR()` function** — before feeding any image to Tesseract, the code now:
+  1. Scales the image up by 2x (Tesseract reads larger text much more accurately)
+  2. Converts to grayscale (removes color noise that confuses the engine)
+  3. Increases contrast by 40% (makes text edges sharper)
+  4. Uses nearest-neighbor scaling for crisp text edges
+- **Added Tesseract character whitelist** — limits Tesseract to only characters that appear on supermarket labels: `A-Z a-z 0-9 space . -`. This prevents Tesseract from hallucinating symbols, emojis, or weird characters
+- **Added `preserve_interword_spaces`** — helps Tesseract keep proper word spacing in product names like "PACIFIC SUNRISE COOKING OIL"
+- **Applied to both scan-time OCR and manual Re-capture** — both code paths now use the same preprocessing and config
+
+### 🔧 Why OCR was failing
+The captured frames were low resolution (often 640×480 or smaller), and the small text on shelf tags was too tiny for Tesseract to read. By scaling up 2x + grayscale + contrast boost, the text becomes readable. The character whitelist also prevents false positives.
+
+---
+
 ## [1.2.1] 2026-06-29 — Remove videoConstraints to fix camera selection
 
 ### ✅ Fixed

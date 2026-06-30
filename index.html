@@ -725,39 +725,49 @@ function onScan(code){
 
   document.getElementById('ocrStatus').textContent = 'Reading label...';
 
+  var processed = preprocessForOCR(capturedFrame);
+
   loadTesseract().then(function(){
     Tesseract.createWorker('eng').then(function(worker){
-      var ocrTimeout = setTimeout(function(){
-        worker.terminate();
-        document.getElementById('ocrStatus').textContent = 'Reading took too long. Type manually or use Photo.';
-      }, 15000);
+      worker.setParameters({
+        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .-',
+        preserve_interword_spaces: '1'
+      }).then(function(){
+        var ocrTimeout = setTimeout(function(){
+          worker.terminate();
+          document.getElementById('ocrStatus').textContent = 'Reading took too long. Type manually or use Photo.';
+        }, 15000);
 
-      worker.recognize(capturedFrame).then(function(result){
-        clearTimeout(ocrTimeout);
-        worker.terminate();
-        var text = result.data.text;
-        console.log('OCR result:', text);
-        var parsed = parseOCR(text);
-        var msgs = [];
-        if(parsed.name){
-          document.getElementById('mProdName').value = parsed.name;
-          msgs.push('Name: "' + parsed.name + '"');
-        }
-        if(parsed.price !== null){
-          document.getElementById('mProdPrice').value = parsed.price.toFixed(2);
-          msgs.push('Price: ₱' + parsed.price.toFixed(2));
-        }
-        if(msgs.length){
-          document.getElementById('ocrStatus').innerHTML = '<span class="ocrtag">Detected</span> ' + msgs.join(' · ');
-          toast('Label captured! Review and save.');
-        } else {
+        worker.recognize(processed).then(function(result){
+          clearTimeout(ocrTimeout);
+          worker.terminate();
+          var text = result.data.text;
+          console.log('OCR result:', text);
+          var parsed = parseOCR(text);
+          var msgs = [];
+          if(parsed.name){
+            document.getElementById('mProdName').value = parsed.name;
+            msgs.push('Name: "' + parsed.name + '"');
+          }
+          if(parsed.price !== null){
+            document.getElementById('mProdPrice').value = parsed.price.toFixed(2);
+            msgs.push('Price: ₱' + parsed.price.toFixed(2));
+          }
+          if(msgs.length){
+            document.getElementById('ocrStatus').innerHTML = '<span class="ocrtag">Detected</span> ' + msgs.join(' · ');
+            toast('Label captured! Review and save.');
+          } else {
+            document.getElementById('ocrStatus').textContent = 'Could not read label. Make sure name + price are visible in the frame above, then tap Re-capture.';
+          }
+        }).catch(function(err){
+          clearTimeout(ocrTimeout);
+          worker.terminate();
+          console.error('OCR error:', err);
           document.getElementById('ocrStatus').textContent = 'Could not read label. Make sure name + price are visible in the frame above, then tap Re-capture.';
-        }
+        });
       }).catch(function(err){
-        clearTimeout(ocrTimeout);
         worker.terminate();
-        console.error('OCR error:', err);
-        document.getElementById('ocrStatus').textContent = 'Could not read label. Make sure name + price are visible in the frame above, then tap Re-capture.';
+        document.getElementById('ocrStatus').textContent = 'OCR config failed: ' + err;
       });
     });
   }).catch(function(err){
@@ -1106,6 +1116,34 @@ function loadTesseract(){
   });
 }
 
+function preprocessForOCR(canvas){
+  // Scale up 2x for better Tesseract accuracy
+  var w = canvas.width * 2;
+  var h = canvas.height * 2;
+  var c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  var ctx = c.getContext('2d');
+  // Use nearest neighbor for sharper text edges
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(canvas, 0, 0, w, h);
+
+  // Grayscale + contrast
+  var imageData = ctx.getImageData(0, 0, w, h);
+  var data = imageData.data;
+  for(var i = 0; i < data.length; i += 4){
+    var gray = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+    // Increase contrast: stretch midtones
+    gray = (gray - 100) * 1.4 + 100;
+    gray = Math.max(0, Math.min(255, gray));
+    data[i] = gray;
+    data[i+1] = gray;
+    data[i+2] = gray;
+  }
+  ctx.putImageData(imageData, 0, 0);
+  return c;
+}
+
 function captureLabel(){
   var status = document.getElementById('ocrStatus');
   status.textContent = 'Loading OCR engine (~10MB, first time only)...';
@@ -1165,28 +1203,40 @@ function onOCRFileSelect(input){
 
 function runOCR(canvas, statusEl){
   statusEl.textContent = 'Reading label... (5-10s on mobile)';
+  var processed = preprocessForOCR(canvas);
   Tesseract.createWorker('eng').then(function(worker){
-    worker.recognize(canvas).then(function(result){
-      worker.terminate().then(function(){
-        var text = result.data.text;
-        console.log('OCR text:', text);
-        var parsed = parseOCR(text);
-        var msgs = [];
-        if(parsed.name){
-          document.getElementById('mProdName').value = parsed.name;
-          msgs.push('Name: "' + parsed.name + '"');
-        }
-        if(parsed.price !== null){
-          document.getElementById('mProdPrice').value = parsed.price.toFixed(2);
-          msgs.push('Price: ₱' + parsed.price.toFixed(2));
-        }
-        if(msgs.length){
-          statusEl.innerHTML = '<span class="ocrtag">Detected</span> ' + msgs.join(' · ');
-          toast('Label captured! Review and save.');
-        } else {
-          statusEl.textContent = 'Could not read name or price. Try clearer photo or type manually.';
-        }
+    worker.setParameters({
+      tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .-',
+      preserve_interword_spaces: '1'
+    }).then(function(){
+      worker.recognize(processed).then(function(result){
+        worker.terminate().then(function(){
+          var text = result.data.text;
+          console.log('OCR text:', text);
+          var parsed = parseOCR(text);
+          var msgs = [];
+          if(parsed.name){
+            document.getElementById('mProdName').value = parsed.name;
+            msgs.push('Name: "' + parsed.name + '"');
+          }
+          if(parsed.price !== null){
+            document.getElementById('mProdPrice').value = parsed.price.toFixed(2);
+            msgs.push('Price: ₱' + parsed.price.toFixed(2));
+          }
+          if(msgs.length){
+            statusEl.innerHTML = '<span class="ocrtag">Detected</span> ' + msgs.join(' · ');
+            toast('Label captured! Review and save.');
+          } else {
+            statusEl.textContent = 'Could not read name or price. Try clearer photo or type manually.';
+          }
+        });
+      }).catch(function(err){
+        worker.terminate();
+        statusEl.textContent = 'OCR failed: ' + err;
       });
+    }).catch(function(err){
+      worker.terminate();
+      statusEl.textContent = 'OCR config failed: ' + err;
     });
   }).catch(function(err){
     statusEl.textContent = 'OCR failed: ' + err;
@@ -1259,7 +1309,7 @@ renderHome();
 <div id="versionFooter" style="position:fixed;bottom:0;left:0;right:0;text-align:center;padding:4px;font-size:10px;color:var(--muted);background:var(--bg);border-top:1px solid var(--border);z-index:50;pointer-events:none;"></div>
 <script>
 (function(){
-  var v = 'v1.2.1';
+  var v = 'v1.2.2';
   var b = document.querySelector('.bnav');
   var f = document.getElementById('versionFooter');
   if(f) f.textContent = 'GroceryScan ' + v + ' · ' + new Date().toLocaleDateString('en-PH',{month:'short',day:'numeric'});
