@@ -607,52 +607,83 @@ function onScan(code){
     return;
   }
 
-  // Brand new — open modal immediately, capture frame and OCR async
-  openPM(code, false, '', '');
-  document.getElementById('ocrStatus').textContent = 'Reading label...';
+  // Brand new product — capture frame FIRST, then open modal, then OCR async
+  var capturedFrame = null;
 
+  // Try video element first
   var video = document.querySelector('#qr-reader video');
-  if(video && video.readyState >= 2 && camActive){
+  if(video && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0 && camActive){
     var c = document.createElement('canvas');
     c.width = video.videoWidth;
     c.height = video.videoHeight;
     var ctx = c.getContext('2d');
     ctx.drawImage(video, 0, 0);
-
-    loadTesseract().then(function(){
-      Tesseract.createWorker('eng').then(function(worker){
-        worker.recognize(c).then(function(result){
-          worker.terminate();
-          var text = result.data.text;
-          console.log('OCR on scan:', text);
-          var parsed = parseOCR(text);
-          var msgs = [];
-          if(parsed.name){
-            document.getElementById('mProdName').value = parsed.name;
-            msgs.push('Name: "' + parsed.name + '"');
-          }
-          if(parsed.price !== null){
-            document.getElementById('mProdPrice').value = parsed.price.toFixed(2);
-            msgs.push('Price: ₱' + parsed.price.toFixed(2));
-          }
-          if(msgs.length){
-            document.getElementById('ocrStatus').innerHTML = '<span class="ocrtag">Detected</span> ' + msgs.join(' · ');
-            toast('Label captured! Review and save.');
-          } else {
-            document.getElementById('ocrStatus').textContent = 'Could not read label. Type manually or use Re-capture / Photo.';
-          }
-        }).catch(function(err){
-          console.error('OCR error:', err);
-          document.getElementById('ocrStatus').textContent = 'Could not read label. Type manually or use Re-capture / Photo.';
-        });
-      });
-    }).catch(function(err){
-      console.error('Tesseract load error:', err);
-      document.getElementById('ocrStatus').textContent = 'OCR engine unavailable. Type manually or use Photo.';
-    });
-  } else {
-    document.getElementById('ocrStatus').textContent = 'Camera not running. Type manually or use Photo.';
+    capturedFrame = c;
+    console.log('Captured from video:', c.width, 'x', c.height);
   }
+
+  // Fallback: try html5-qrcode's internal canvas
+  if(!capturedFrame){
+    var canvases = document.querySelectorAll('#qr-reader canvas');
+    for(var i = 0; i < canvases.length; i++){
+      var cv = canvases[i];
+      if(cv.width > 100 && cv.height > 100){
+        capturedFrame = cv;
+        console.log('Captured from canvas:', cv.width, 'x', cv.height);
+        break;
+      }
+    }
+  }
+
+  // Open modal immediately (modal doesn't stop camera)
+  openPM(code, false, '', '');
+
+  if(!capturedFrame){
+    document.getElementById('ocrStatus').textContent = 'No frame captured. Type manually or use Photo.';
+    return;
+  }
+
+  document.getElementById('ocrStatus').textContent = 'Reading label...';
+
+  loadTesseract().then(function(){
+    Tesseract.createWorker('eng').then(function(worker){
+      var ocrTimeout = setTimeout(function(){
+        worker.terminate();
+        document.getElementById('ocrStatus').textContent = 'Reading took too long. Type manually or use Photo.';
+      }, 15000);
+
+      worker.recognize(capturedFrame).then(function(result){
+        clearTimeout(ocrTimeout);
+        worker.terminate();
+        var text = result.data.text;
+        console.log('OCR result:', text);
+        var parsed = parseOCR(text);
+        var msgs = [];
+        if(parsed.name){
+          document.getElementById('mProdName').value = parsed.name;
+          msgs.push('Name: "' + parsed.name + '"');
+        }
+        if(parsed.price !== null){
+          document.getElementById('mProdPrice').value = parsed.price.toFixed(2);
+          msgs.push('Price: ₱' + parsed.price.toFixed(2));
+        }
+        if(msgs.length){
+          document.getElementById('ocrStatus').innerHTML = '<span class="ocrtag">Detected</span> ' + msgs.join(' · ');
+          toast('Label captured! Review and save.');
+        } else {
+          document.getElementById('ocrStatus').textContent = 'Could not read label. Type manually or use Re-capture / Photo.';
+        }
+      }).catch(function(err){
+        clearTimeout(ocrTimeout);
+        worker.terminate();
+        console.error('OCR error:', err);
+        document.getElementById('ocrStatus').textContent = 'Could not read label. Type manually or use Re-capture / Photo.';
+      });
+    });
+  }).catch(function(err){
+    console.error('Tesseract load error:', err);
+    document.getElementById('ocrStatus').textContent = 'OCR engine unavailable. Type manually or use Photo.';
+  });
 }
 
 function showLastScanned(name, price, code){
@@ -1000,17 +1031,28 @@ function captureLabel(){
   status.textContent = 'Loading OCR engine (~10MB, first time only)...';
   loadTesseract().then(function(){
     status.textContent = 'Capturing frame...';
+    var captured = null;
     var video = document.querySelector('#qr-reader video');
-    if(!video || video.readyState < 2){
+    if(video && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0){
+      var c = document.createElement('canvas');
+      c.width = video.videoWidth;
+      c.height = video.videoHeight;
+      var ctx = c.getContext('2d');
+      ctx.drawImage(video, 0, 0);
+      captured = c;
+    }
+    if(!captured){
+      var canvases = document.querySelectorAll('#qr-reader canvas');
+      for(var i = 0; i < canvases.length; i++){
+        var cv = canvases[i];
+        if(cv.width > 100 && cv.height > 100){ captured = cv; break; }
+      }
+    }
+    if(!captured){
       status.textContent = 'Camera not active. Start camera first or use Photo option.';
       return;
     }
-    var c = document.createElement('canvas');
-    c.width = video.videoWidth;
-    c.height = video.videoHeight;
-    var ctx = c.getContext('2d');
-    ctx.drawImage(video, 0, 0);
-    runOCR(c, status);
+    runOCR(captured, status);
   }).catch(function(err){ status.textContent = 'Error: ' + err; });
 }
 
@@ -1131,7 +1173,7 @@ renderHome();
 <div id="versionFooter" style="position:fixed;bottom:0;left:0;right:0;text-align:center;padding:4px;font-size:10px;color:var(--muted);background:var(--bg);border-top:1px solid var(--border);z-index:50;pointer-events:none;"></div>
 <script>
 (function(){
-  var v = 'v1.1.6';
+  var v = 'v1.1.7';
   var b = document.querySelector('.bnav');
   var f = document.getElementById('versionFooter');
   if(f) f.textContent = 'GroceryScan ' + v + ' · ' + new Date().toLocaleDateString('en-PH',{month:'short',day:'numeric'});

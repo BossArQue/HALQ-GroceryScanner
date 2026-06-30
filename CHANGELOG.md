@@ -5,6 +5,17 @@ Format: `[version] YYYY-MM-DD — description`
 
 ---
 
+## [1.1.7] 2026-06-29 — Frame capture before modal + canvas fallback
+
+### ✅ Fixed
+- **Frame captured BEFORE modal opens** — the `drawImage()` call now happens before `openPM()`, so the frame is the exact moment the barcode was detected, not after the user moves the camera
+- **Canvas fallback** — if the `<video>` element can't be read, the code falls back to `html5-qrcode`'s internal `<canvas>` element (which also contains the live frame)
+- **Dimension validation** — checks `video.videoWidth > 0` and `video.videoHeight > 0` before drawing; if zero, falls back to canvas
+- **15-second OCR timeout** — prevents the "Reading label..." spinner from hanging forever if Tesseract gets stuck
+- **Same fixes applied to manual "Re-capture" button** — the manual capture button also tries video then canvas fallback
+
+---
+
 ## [1.1.6] 2026-06-29 — Fix camera toggle + async OCR feedback
 
 ### ✅ Fixed
