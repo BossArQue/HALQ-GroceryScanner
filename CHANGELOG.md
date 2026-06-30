@@ -5,6 +5,25 @@ Format: `[version] YYYY-MM-DD — description`
 
 ---
 
+## [1.2.3] 2026-06-29 — Show raw OCR text + parser fixes + setParameters fallback
+
+### ✅ Fixed
+- **Shows raw OCR text when parsing fails** — when Tesseract can't extract name/price, the status now displays the first 5 lines of raw OCR text (e.g., "Could not parse. Raw text: PACIFIC | SUNRISE | 138.00 | ..."). This lets you see exactly what Tesseract is reading and tell me what needs fixing
+- **Loosened parser filters** — the `parseOCR` function now:
+  - Only rejects pure price lines like "138.00" (not lines that happen to contain a price)
+  - Added fallback: if no "clean" name is found, uses the longest line containing any letters
+  - Added price fallback: if no non-per-kg price is found, uses the largest price of any type
+- **`setParameters` failure fallback** — if `worker.setParameters()` fails (not supported in all Tesseract.js versions), the code falls back to `worker.recognize()` without parameters instead of crashing
+- **Applied fallback to both scan-time and manual Re-capture** — both paths handle `setParameters` failure gracefully
+
+### 🔧 What to do if OCR still doesn't work
+1. Scan a new product
+2. Look at the modal status — it will show the raw OCR text if nothing was parsed
+3. Take a screenshot of the modal (with the preview + raw text) and show me
+4. I'll adjust the parser based on the actual text Tesseract produces
+
+---
+
 ## [1.2.2] 2026-06-29 — Image preprocessing + Tesseract whitelist for better OCR
 
 ### ✅ Fixed
