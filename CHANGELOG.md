@@ -5,6 +5,21 @@ Format: `[version] YYYY-MM-DD — description`
 
 ---
 
+## [1.2.1] 2026-06-29 — Remove videoConstraints to fix camera selection
+
+### ✅ Fixed
+- **Removed `videoConstraints` from scanner config** — when both `deviceId` and `width/height` constraints are passed to `getUserMedia()`, some Android Chrome versions ignore the `deviceId` and pick the default camera (usually front). By removing `videoConstraints`, the `deviceId` is the only constraint, and the browser correctly uses the requested camera
+- **Removed `videoConstraints` from both `startCamera()` and `toggleCamera()`** — both entry points now use the same config without resolution hints
+
+### 🔧 Why the front camera was still opening despite the debug panel showing "back"
+The browser was receiving:
+```
+{ deviceId: { exact: "back-camera-id" }, width: { ideal: 1280 }, height: { ideal: 720 } }
+```
+When the back camera doesn't support exactly 1280×720, Android Chrome sometimes falls back to the default camera (front) instead of the closest matching resolution on the requested device. Removing `videoConstraints` fixes this.
+
+---
+
 ## [1.2.0] 2026-06-29 — On-screen camera debug panel
 
 ### ✅ Added

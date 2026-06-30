@@ -492,7 +492,7 @@ function startCamera(){
   document.getElementById('startCamBtn').disabled = true;
   document.getElementById('qr-reader').innerHTML = '';
 
-  var scanConfig = { fps: 30, qrbox: { width: 320, height: 200 }, formatsToSupport: _getFormats(), videoConstraints: { width: { ideal: 1280 }, height: { ideal: 720 } } };
+  var scanConfig = { fps: 30, qrbox: { width: 320, height: 200 }, formatsToSupport: _getFormats() };
 
   // Always enumerate cameras first so _camDevices is populated for the toggle button
   if(typeof Html5Qrcode !== 'undefined' && typeof Html5Qrcode.getCameras === 'function'){
@@ -569,7 +569,7 @@ function toggleCamera(){
   showCamDebug(debugLines);
   stopCamera();
   setTimeout(function(){
-    var scanConfig = { fps: 30, qrbox: { width: 320, height: 200 }, formatsToSupport: _getFormats(), videoConstraints: { width: { ideal: 1280 }, height: { ideal: 720 } } };
+    var scanConfig = { fps: 30, qrbox: { width: 320, height: 200 }, formatsToSupport: _getFormats() };
     startScanner({ facingMode: nextFacing }, scanConfig);
   }, 300);
 }
@@ -1259,7 +1259,7 @@ renderHome();
 <div id="versionFooter" style="position:fixed;bottom:0;left:0;right:0;text-align:center;padding:4px;font-size:10px;color:var(--muted);background:var(--bg);border-top:1px solid var(--border);z-index:50;pointer-events:none;"></div>
 <script>
 (function(){
-  var v = 'v1.2.0';
+  var v = 'v1.2.1';
   var b = document.querySelector('.bnav');
   var f = document.getElementById('versionFooter');
   if(f) f.textContent = 'GroceryScan ' + v + ' · ' + new Date().toLocaleDateString('en-PH',{month:'short',day:'numeric'});
