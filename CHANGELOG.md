@@ -5,6 +5,20 @@ Format: `[version] YYYY-MM-DD — description`
 
 ---
 
+## [1.2.4] 2026-06-29 — qrbox = capture area, crop preview to match border
+
+### ✅ Fixed
+- **Qrbox now covers 85% of the camera view** — changed from a fixed `320×200` box to a dynamic function that returns `85%` of the viewfinder width and height. This makes the border almost the full camera view, so you naturally hold the phone further back and the whole label (barcode + name + price) is visible and in focus
+- **Capture now crops to the qrbox area** — both `preprocessForOCR()` and the preview use `cropForPreview()` to extract only the center `85%` of the captured frame. This means:
+  - The preview thumbnail shows exactly what was inside the border (not the blurry edges)
+  - The OCR reads the focused center region (not the blurry background)
+- **Removed discrepancy between border and capture** — before: border showed a focused rectangle, capture grabbed the full blurry frame. Now: border and capture show the same region
+
+### 🔧 Why the OCR was blurry
+The small `320×200` qrbox made you hold the phone very close to the barcode. The autofocus locked onto that tiny area. But the capture grabbed the entire `640×480` frame, where the name and price above the barcode were tiny and out of focus. By making the border = the capture area (both 85% of the view), everything inside the border is in focus and captured at full resolution.
+
+---
+
 ## [1.2.3] 2026-06-29 — Show raw OCR text + parser fixes + setParameters fallback
 
 ### ✅ Fixed

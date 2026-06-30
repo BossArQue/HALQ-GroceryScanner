@@ -492,7 +492,7 @@ function startCamera(){
   document.getElementById('startCamBtn').disabled = true;
   document.getElementById('qr-reader').innerHTML = '';
 
-  var scanConfig = { fps: 30, qrbox: { width: 320, height: 200 }, formatsToSupport: _getFormats() };
+  var scanConfig = { fps: 30, qrbox: function(vw, vh){ return { width: Math.round(vw*0.85), height: Math.round(vh*0.85) }; }, formatsToSupport: _getFormats() };
 
   // Always enumerate cameras first so _camDevices is populated for the toggle button
   if(typeof Html5Qrcode !== 'undefined' && typeof Html5Qrcode.getCameras === 'function'){
@@ -569,7 +569,7 @@ function toggleCamera(){
   showCamDebug(debugLines);
   stopCamera();
   setTimeout(function(){
-    var scanConfig = { fps: 30, qrbox: { width: 320, height: 200 }, formatsToSupport: _getFormats() };
+    var scanConfig = { fps: 30, qrbox: function(vw, vh){ return { width: Math.round(vw*0.85), height: Math.round(vh*0.85) }; }, formatsToSupport: _getFormats() };
     startScanner({ facingMode: nextFacing }, scanConfig);
   }, 300);
 }
@@ -709,10 +709,11 @@ function onScan(code){
   // Open modal immediately (modal doesn't stop camera)
   openPM(code, false, '', '');
 
-  // Show captured frame preview
+  // Show captured frame preview (cropped to match qrbox)
   var previewImg = document.getElementById('ocrPreview');
   if(capturedFrame && previewImg){
-    previewImg.src = capturedFrame.toDataURL('image/jpeg', 0.8);
+    var croppedPreview = cropForPreview(capturedFrame);
+    previewImg.src = croppedPreview.toDataURL('image/jpeg', 0.8);
     previewImg.style.display = 'block';
   } else if(previewImg){
     previewImg.style.display = 'none';
@@ -1149,19 +1150,22 @@ function loadTesseract(){
 }
 
 function preprocessForOCR(canvas){
-  // Scale up 2x for better Tesseract accuracy
-  var w = canvas.width * 2;
-  var h = canvas.height * 2;
+  // Crop center 85% to match qrbox, then scale up 2x for Tesseract
+  var cropPct = 0.85;
+  var cw = canvas.width * cropPct;
+  var ch = canvas.height * cropPct;
+  var cx = (canvas.width - cw) / 2;
+  var cy = (canvas.height - ch) / 2;
   var c = document.createElement('canvas');
-  c.width = w;
-  c.height = h;
+  c.width = cw * 2;
+  c.height = ch * 2;
   var ctx = c.getContext('2d');
   // Use nearest neighbor for sharper text edges
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(canvas, 0, 0, w, h);
+  ctx.drawImage(canvas, cx, cy, cw, ch, 0, 0, c.width, c.height);
 
   // Grayscale + contrast
-  var imageData = ctx.getImageData(0, 0, w, h);
+  var imageData = ctx.getImageData(0, 0, c.width, c.height);
   var data = imageData.data;
   for(var i = 0; i < data.length; i += 4){
     var gray = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
@@ -1173,6 +1177,20 @@ function preprocessForOCR(canvas){
     data[i+2] = gray;
   }
   ctx.putImageData(imageData, 0, 0);
+  return c;
+}
+
+function cropForPreview(canvas){
+  var cropPct = 0.85;
+  var cw = canvas.width * cropPct;
+  var ch = canvas.height * cropPct;
+  var cx = (canvas.width - cw) / 2;
+  var cy = (canvas.height - ch) / 2;
+  var c = document.createElement('canvas');
+  c.width = cw;
+  c.height = ch;
+  var ctx = c.getContext('2d');
+  ctx.drawImage(canvas, cx, cy, cw, ch, 0, 0, cw, ch);
   return c;
 }
 
@@ -1202,10 +1220,11 @@ function captureLabel(){
       status.textContent = 'Camera not active. Start camera first or use Photo option.';
       return;
     }
-    // Show preview
+    // Show preview (cropped to match qrbox)
     var previewImg = document.getElementById('ocrPreview');
     if(previewImg){
-      previewImg.src = captured.toDataURL('image/jpeg', 0.8);
+      var croppedPreview = cropForPreview(captured);
+      previewImg.src = croppedPreview.toDataURL('image/jpeg', 0.8);
       previewImg.style.display = 'block';
     }
     runOCR(captured, status);
@@ -1387,7 +1406,7 @@ renderHome();
 <div id="versionFooter" style="position:fixed;bottom:0;left:0;right:0;text-align:center;padding:4px;font-size:10px;color:var(--muted);background:var(--bg);border-top:1px solid var(--border);z-index:50;pointer-events:none;"></div>
 <script>
 (function(){
-  var v = 'v1.2.3';
+  var v = 'v1.2.4';
   var b = document.querySelector('.bnav');
   var f = document.getElementById('versionFooter');
   if(f) f.textContent = 'GroceryScan ' + v + ' · ' + new Date().toLocaleDateString('en-PH',{month:'short',day:'numeric'});
