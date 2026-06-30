@@ -5,6 +5,20 @@ Format: `[version] YYYY-MM-DD — description`
 
 ---
 
+## [1.2.0] 2026-06-29 — On-screen camera debug panel
+
+### ✅ Added
+- **Camera info panel on Scan screen** — a small card shows the number of cameras detected, their names, and which one is currently active. No need for DevTools anymore — everything is visible on screen
+- **Debug panel updates on toggle** — when you tap "🔄 Switch Camera", the panel shows which camera was switched to
+- **Debug panel clears on Reset** — tapping "↺ Reset" clears the debug panel and localStorage
+- **Debug panel hidden when camera is off** — stops cluttering the UI when not needed
+- **Debug info shown in startScanner** — after the camera starts successfully, the panel adds a line showing which camera is actually active
+
+### 🔧 Why this was needed
+Chrome on mobile doesn't have DevTools, so the console logging from v1.1.9 was useless. This on-screen panel lets you see what's happening with camera detection without any developer tools.
+
+---
+
 ## [1.1.9] 2026-06-29 — Camera reset + toggle fix + better rear detection
 
 ### ✅ Fixed

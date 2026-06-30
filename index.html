@@ -345,6 +345,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
     <button class="btn bp bfull" id="startCamBtn" onclick="startCamera()">▶ Start Camera</button>
     <button class="btn bg bfull hidden" id="stopCamBtn" onclick="stopCamera()">⏹ Stop Camera</button>
 
+    <!-- Camera debug info -->
+    <div class="card" id="camDebug" style="padding:8px 12px;display:none;font-size:11px;color:var(--muted);background:rgba(125,222,125,.05);border:1px dashed var(--border);">
+      <div style="font-weight:600;color:var(--accent);margin-bottom:2px;">📷 Camera Info</div>
+      <div id="camDebugBody"></div>
+    </div>
+
     <!-- Manual entry -->
     <div class="manualbtn" onclick="openManual()">⌨️ Enter barcode manually instead</div>
 
@@ -467,6 +473,14 @@ var _camDevices = [];
 var _savedCamId = null;
 try{ _savedCamId = localStorage.getItem('gscan_cam'); }catch(e){}
 
+function showCamDebug(lines){
+  var dbg = document.getElementById('camDebug');
+  var body = document.getElementById('camDebugBody');
+  if(!dbg || !body) return;
+  dbg.style.display = 'block';
+  body.innerHTML = lines.map(function(l){ return '<div style="margin-bottom:1px;">' + l + '</div>'; }).join('');
+}
+
 function startCamera(){
   if(camActive) return;
   if(typeof Html5Qrcode === 'undefined'){
@@ -484,13 +498,18 @@ function startCamera(){
   if(typeof Html5Qrcode !== 'undefined' && typeof Html5Qrcode.getCameras === 'function'){
     Html5Qrcode.getCameras().then(function(devices){
       _camDevices = devices || [];
-      console.log('Cameras found:', _camDevices.length, _camDevices.map(function(d){ return d.label + ' (' + d.id + ')'; }));
+
+      var debugLines = ['Found ' + _camDevices.length + ' camera(s)'];
+      _camDevices.forEach(function(d, i){
+        var shortLabel = d.label || 'Camera ' + (i + 1);
+        debugLines.push((i+1) + '. ' + shortLabel);
+      });
 
       var cameraId = { facingMode: 'environment' };
       var usingSaved = false;
       if(_savedCamId){
         var savedDevice = _camDevices.find(function(d){ return d.id === _savedCamId; });
-        if(savedDevice){ cameraId = _savedCamId; usingSaved = true; console.log('Using saved camera:', savedDevice.label); }
+        if(savedDevice){ cameraId = _savedCamId; usingSaved = true; debugLines.push('Using saved: ' + savedDevice.label); }
       }
       if(!usingSaved && _camDevices.length){
         var backCam = _camDevices.find(function(d){
@@ -498,14 +517,16 @@ function startCamera(){
           return l.indexOf('back') !== -1 || l.indexOf('rear') !== -1 || l.indexOf('environment') !== -1 || l.indexOf('facing back') !== -1 || l.indexOf('world') !== -1;
         });
         var rearCam = backCam || _camDevices[_camDevices.length - 1];
-        if(rearCam){ cameraId = rearCam.id; console.log('Auto-selected rear camera:', rearCam.label); }
+        if(rearCam){ cameraId = rearCam.id; debugLines.push('Selected rear: ' + rearCam.label); }
       }
+      showCamDebug(debugLines);
       startScanner(cameraId, scanConfig);
     }).catch(function(err){
-      console.log('getCameras failed:', err);
+      showCamDebug(['getCameras() failed: ' + err, 'Falling back to facingMode: environment']);
       startScanner({ facingMode: 'environment' }, scanConfig);
     });
   } else {
+    showCamDebug(['getCameras() not available', 'Falling back to facingMode: environment']);
     startScanner({ facingMode: 'environment' }, scanConfig);
   }
 }
@@ -513,12 +534,16 @@ function startCamera(){
 function resetCamera(){
   _savedCamId = null;
   try{ localStorage.removeItem('gscan_cam'); }catch(e){}
+  document.getElementById('camDebug').style.display = 'none';
+  document.getElementById('camDebugBody').innerHTML = '';
   toast('Camera reset. Tap Start Camera to try again.');
   if(camActive){ stopCamera(); }
 }
 
 function toggleCamera(){
   if(!camActive) return;
+
+  var debugLines = [];
 
   // If we have enumerated devices, cycle through them
   if(_camDevices.length >= 2){
@@ -530,6 +555,8 @@ function toggleCamera(){
     var nextIdx = (currentIdx + 1) % _camDevices.length;
     _savedCamId = _camDevices[nextIdx].id;
     try{ localStorage.setItem('gscan_cam', _savedCamId); }catch(e){}
+    debugLines.push('Switched to: ' + _camDevices[nextIdx].label);
+    showCamDebug(debugLines);
     stopCamera();
     setTimeout(startCamera, 300);
     return;
@@ -538,6 +565,8 @@ function toggleCamera(){
   // Fallback: toggle facingMode between environment and user
   var nextFacing = _lastFacing === 'environment' ? 'user' : 'environment';
   _lastFacing = nextFacing;
+  debugLines.push('Fallback mode: ' + nextFacing);
+  showCamDebug(debugLines);
   stopCamera();
   setTimeout(function(){
     var scanConfig = { fps: 30, qrbox: { width: 320, height: 200 }, formatsToSupport: _getFormats(), videoConstraints: { width: { ideal: 1280 }, height: { ideal: 720 } } };
@@ -579,6 +608,12 @@ function startScanner(cameraId, config){
     document.getElementById('camResetBtn').classList.remove('hidden');
     // Show toggle if we have 2+ enumerated cameras, OR if we're in fallback mode (might have multiple cameras)
     document.getElementById('camToggleBtn').classList.toggle('hidden', _camDevices.length < 2 && typeof cameraId === 'string');
+    // Update debug panel with active info
+    var dbgBody = document.getElementById('camDebugBody');
+    if(dbgBody && dbgBody.innerHTML && typeof cameraId === 'string'){
+      var activeLabel = _camDevices.find(function(d){ return d.id === cameraId; });
+      showCamDebug(dbgBody.innerHTML.split('</div>').map(function(s){ return s.replace(/<[^>]*>/g,''); }).filter(function(s){ return s.trim(); }).concat(['Active: ' + (activeLabel ? activeLabel.label : cameraId)]));
+    }
   }).catch(function(err){
     camActive = false;
     document.getElementById('startCamBtn').disabled = false;
@@ -611,6 +646,7 @@ function stopCamera(){
       document.getElementById('stopCamBtn').classList.add('hidden');
       document.getElementById('camToggleBtn').classList.add('hidden');
       document.getElementById('camResetBtn').classList.add('hidden');
+      document.getElementById('camDebug').style.display = 'none';
       setScanMsg('');
     }).catch(function(){
       qrScanner=null; camActive=false;
@@ -1223,7 +1259,7 @@ renderHome();
 <div id="versionFooter" style="position:fixed;bottom:0;left:0;right:0;text-align:center;padding:4px;font-size:10px;color:var(--muted);background:var(--bg);border-top:1px solid var(--border);z-index:50;pointer-events:none;"></div>
 <script>
 (function(){
-  var v = 'v1.1.9';
+  var v = 'v1.2.0';
   var b = document.querySelector('.bnav');
   var f = document.getElementById('versionFooter');
   if(f) f.textContent = 'GroceryScan ' + v + ' · ' + new Date().toLocaleDateString('en-PH',{month:'short',day:'numeric'});
