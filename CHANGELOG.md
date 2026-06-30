@@ -5,6 +5,20 @@ Format: `[version] YYYY-MM-DD — description`
 
 ---
 
+## [1.1.9] 2026-06-29 — Camera reset + toggle fix + better rear detection
+
+### ✅ Fixed
+- **Added "↺ Reset" button** — clears the saved camera preference from localStorage and stops the camera. Tap it, then tap Start Camera again to force fresh camera enumeration without any saved state
+- **Toggle now works even when `getCameras()` fails** — fallback mode toggles between `facingMode: 'environment'` and `facingMode: 'user'` when device enumeration isn't available
+- **Better rear camera detection** — now also checks for "facing back", "world" in camera labels. Added `console.log` so you can check DevTools to see what cameras were detected
+- **Toggle button now visible in fallback mode** — even if only 1 camera was enumerated, the toggle shows if the camera started successfully (some devices report 1 camera but actually support both)
+- **Console logging for camera names** — open Chrome DevTools → Console to see the full list of detected cameras with labels and IDs
+
+### 🔧 Why the front camera was opening
+The `_savedCamId` in localStorage was likely pointing to the front camera from a previous session. The saved ID persists across page reloads, so every time you opened the app, it kept using the front camera. The **Reset** button clears this.
+
+---
+
 ## [1.1.8] 2026-06-29 — Camera resolution + captured frame preview
 
 ### ✅ Changed

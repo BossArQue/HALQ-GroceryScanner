@@ -335,8 +335,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
 
     <div id="scanMsg" style="text-align:center;color:var(--muted);font-size:13px;line-height:1.6;min-height:36px;"></div>
 
-    <!-- Camera toggle -->
-    <button class="btn bg bfull hidden" id="camToggleBtn" onclick="toggleCamera()" style="margin-top:4px;">🔄 Switch Camera</button>
+    <!-- Camera toggle + reset -->
+    <div id="camControls" style="display:flex;gap:8px;margin-top:4px;">
+      <button class="btn bg bfull hidden" id="camToggleBtn" onclick="toggleCamera()" style="flex:2;">🔄 Switch Camera</button>
+      <button class="btn bg bfull hidden" id="camResetBtn" onclick="resetCamera()" style="flex:1;font-size:12px;">↺ Reset</button>
+    </div>
 
     <!-- Start / Retry button -->
     <button class="btn bp bfull" id="startCamBtn" onclick="startCamera()">▶ Start Camera</button>
@@ -475,38 +478,27 @@ function startCamera(){
   document.getElementById('startCamBtn').disabled = true;
   document.getElementById('qr-reader').innerHTML = '';
 
-  var formats = [];
-  if(typeof Html5QrcodeSupportedFormats !== 'undefined'){
-    formats = [
-      Html5QrcodeSupportedFormats.CODE_128,
-      Html5QrcodeSupportedFormats.EAN_13,
-      Html5QrcodeSupportedFormats.EAN_8,
-      Html5QrcodeSupportedFormats.UPC_A,
-      Html5QrcodeSupportedFormats.UPC_E,
-      Html5QrcodeSupportedFormats.CODE_39
-    ];
-  }
-
-  var scanConfig = { fps: 30, qrbox: { width: 320, height: 200 }, formatsToSupport: formats, videoConstraints: { width: { ideal: 1280 }, height: { ideal: 720 } } };
+  var scanConfig = { fps: 30, qrbox: { width: 320, height: 200 }, formatsToSupport: _getFormats(), videoConstraints: { width: { ideal: 1280 }, height: { ideal: 720 } } };
 
   // Always enumerate cameras first so _camDevices is populated for the toggle button
   if(typeof Html5Qrcode !== 'undefined' && typeof Html5Qrcode.getCameras === 'function'){
     Html5Qrcode.getCameras().then(function(devices){
       _camDevices = devices || [];
+      console.log('Cameras found:', _camDevices.length, _camDevices.map(function(d){ return d.label + ' (' + d.id + ')'; }));
 
       var cameraId = { facingMode: 'environment' };
       var usingSaved = false;
       if(_savedCamId){
         var savedDevice = _camDevices.find(function(d){ return d.id === _savedCamId; });
-        if(savedDevice){ cameraId = _savedCamId; usingSaved = true; }
+        if(savedDevice){ cameraId = _savedCamId; usingSaved = true; console.log('Using saved camera:', savedDevice.label); }
       }
       if(!usingSaved && _camDevices.length){
         var backCam = _camDevices.find(function(d){
           var l = d.label.toLowerCase();
-          return l.indexOf('back') !== -1 || l.indexOf('rear') !== -1 || l.indexOf('environment') !== -1;
+          return l.indexOf('back') !== -1 || l.indexOf('rear') !== -1 || l.indexOf('environment') !== -1 || l.indexOf('facing back') !== -1 || l.indexOf('world') !== -1;
         });
         var rearCam = backCam || _camDevices[_camDevices.length - 1];
-        if(rearCam) cameraId = rearCam.id;
+        if(rearCam){ cameraId = rearCam.id; console.log('Auto-selected rear camera:', rearCam.label); }
       }
       startScanner(cameraId, scanConfig);
     }).catch(function(err){
@@ -518,19 +510,57 @@ function startCamera(){
   }
 }
 
-function toggleCamera(){
-  if(!camActive || !_camDevices.length) return;
-  var currentIdx = 0;
-  if(_savedCamId){
-    currentIdx = _camDevices.findIndex(function(d){ return d.id === _savedCamId; });
-    if(currentIdx === -1) currentIdx = 0;
-  }
-  var nextIdx = (currentIdx + 1) % _camDevices.length;
-  _savedCamId = _camDevices[nextIdx].id;
-  try{ localStorage.setItem('gscan_cam', _savedCamId); }catch(e){}
-  stopCamera();
-  setTimeout(startCamera, 300);
+function resetCamera(){
+  _savedCamId = null;
+  try{ localStorage.removeItem('gscan_cam'); }catch(e){}
+  toast('Camera reset. Tap Start Camera to try again.');
+  if(camActive){ stopCamera(); }
 }
+
+function toggleCamera(){
+  if(!camActive) return;
+
+  // If we have enumerated devices, cycle through them
+  if(_camDevices.length >= 2){
+    var currentIdx = 0;
+    if(_savedCamId){
+      currentIdx = _camDevices.findIndex(function(d){ return d.id === _savedCamId; });
+      if(currentIdx === -1) currentIdx = 0;
+    }
+    var nextIdx = (currentIdx + 1) % _camDevices.length;
+    _savedCamId = _camDevices[nextIdx].id;
+    try{ localStorage.setItem('gscan_cam', _savedCamId); }catch(e){}
+    stopCamera();
+    setTimeout(startCamera, 300);
+    return;
+  }
+
+  // Fallback: toggle facingMode between environment and user
+  var nextFacing = _lastFacing === 'environment' ? 'user' : 'environment';
+  _lastFacing = nextFacing;
+  stopCamera();
+  setTimeout(function(){
+    var scanConfig = { fps: 30, qrbox: { width: 320, height: 200 }, formatsToSupport: _getFormats(), videoConstraints: { width: { ideal: 1280 }, height: { ideal: 720 } } };
+    startScanner({ facingMode: nextFacing }, scanConfig);
+  }, 300);
+}
+
+function _getFormats(){
+  var formats = [];
+  if(typeof Html5QrcodeSupportedFormats !== 'undefined'){
+    formats = [
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.CODE_39
+    ];
+  }
+  return formats;
+}
+
+var _lastFacing = 'environment';
 
 function startScanner(cameraId, config){
   qrScanner = new Html5Qrcode('qr-reader');
@@ -546,7 +576,9 @@ function startScanner(cameraId, config){
     document.getElementById('scanFrameOverlay').style.display = 'flex';
     document.getElementById('startCamBtn').classList.add('hidden');
     document.getElementById('stopCamBtn').classList.remove('hidden');
-    document.getElementById('camToggleBtn').classList.toggle('hidden', _camDevices.length < 2);
+    document.getElementById('camResetBtn').classList.remove('hidden');
+    // Show toggle if we have 2+ enumerated cameras, OR if we're in fallback mode (might have multiple cameras)
+    document.getElementById('camToggleBtn').classList.toggle('hidden', _camDevices.length < 2 && typeof cameraId === 'string');
   }).catch(function(err){
     camActive = false;
     document.getElementById('startCamBtn').disabled = false;
@@ -578,6 +610,7 @@ function stopCamera(){
       document.getElementById('startCamBtn').disabled = false;
       document.getElementById('stopCamBtn').classList.add('hidden');
       document.getElementById('camToggleBtn').classList.add('hidden');
+      document.getElementById('camResetBtn').classList.add('hidden');
       setScanMsg('');
     }).catch(function(){
       qrScanner=null; camActive=false;
@@ -1190,7 +1223,7 @@ renderHome();
 <div id="versionFooter" style="position:fixed;bottom:0;left:0;right:0;text-align:center;padding:4px;font-size:10px;color:var(--muted);background:var(--bg);border-top:1px solid var(--border);z-index:50;pointer-events:none;"></div>
 <script>
 (function(){
-  var v = 'v1.1.8';
+  var v = 'v1.1.9';
   var b = document.querySelector('.bnav');
   var f = document.getElementById('versionFooter');
   if(f) f.textContent = 'GroceryScan ' + v + ' · ' + new Date().toLocaleDateString('en-PH',{month:'short',day:'numeric'});
