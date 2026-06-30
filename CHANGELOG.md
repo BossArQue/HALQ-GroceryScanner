@@ -5,6 +5,20 @@ Format: `[version] YYYY-MM-DD — description`
 
 ---
 
+## [1.1.8] 2026-06-29 — Camera resolution + captured frame preview
+
+### ✅ Changed
+- **Added `videoConstraints` back** — `{ width: { ideal: 1280 }, height: { ideal: 720 } }` requests higher resolution from the camera without forcing it (uses `ideal` not `exact`, so it won't crash on unsupported cameras)
+- **Larger qrbox** — increased from 260×160 to 320×200. This makes the user hold the phone slightly further back, so the full label (barcode + name + price) is more likely to be in the camera frame
+- **Captured frame preview in modal** — when a new product is scanned, the modal now shows a small thumbnail of the exact frame that was captured. You can see what the OCR is trying to read. If the frame is blurry, dark, or missing the label, tap "📷 Re-capture" while pointing the camera at the full label
+- **Better status messages** — "Could not read label" now says: "Make sure name + price are visible in the frame above, then tap Re-capture."
+- **Re-capture also updates preview** — tapping Re-capture refreshes both the preview image and runs OCR again
+
+### 🔧 Why the OCR was failing
+The browser defaults to a low camera resolution (often 320×240 or 640×480) when no `videoConstraints` are specified. At that resolution, the small text on supermarket shelf tags is too tiny for Tesseract to read. The higher resolution request + larger qrbox should fix this.
+
+---
+
 ## [1.1.7] 2026-06-29 — Frame capture before modal + canvas fallback
 
 ### ✅ Fixed
