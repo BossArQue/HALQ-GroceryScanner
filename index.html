@@ -492,7 +492,7 @@ function startCamera(){
   document.getElementById('startCamBtn').disabled = true;
   document.getElementById('qr-reader').innerHTML = '';
 
-  var scanConfig = { fps: 30, qrbox: function(vw, vh){ return { width: Math.round(vw*0.85), height: Math.round(vh*0.85) }; }, formatsToSupport: _getFormats() };
+  var scanConfig = { fps: 30, formatsToSupport: _getFormats() };
 
   // Always enumerate cameras first so _camDevices is populated for the toggle button
   if(typeof Html5Qrcode !== 'undefined' && typeof Html5Qrcode.getCameras === 'function'){
@@ -569,7 +569,7 @@ function toggleCamera(){
   showCamDebug(debugLines);
   stopCamera();
   setTimeout(function(){
-    var scanConfig = { fps: 30, qrbox: function(vw, vh){ return { width: Math.round(vw*0.85), height: Math.round(vh*0.85) }; }, formatsToSupport: _getFormats() };
+    var scanConfig = { fps: 30, formatsToSupport: _getFormats() };
     startScanner({ facingMode: nextFacing }, scanConfig);
   }, 300);
 }
@@ -1150,15 +1150,15 @@ function loadTesseract(){
 }
 
 function preprocessForOCR(canvas){
-  // Crop center 85% to match qrbox, then scale up 2x for Tesseract
-  var cropPct = 0.85;
+  // Crop center 70% (zoom in since phone is held further back), then scale up 3x for Tesseract
+  var cropPct = 0.70;
   var cw = canvas.width * cropPct;
   var ch = canvas.height * cropPct;
   var cx = (canvas.width - cw) / 2;
   var cy = (canvas.height - ch) / 2;
   var c = document.createElement('canvas');
-  c.width = cw * 2;
-  c.height = ch * 2;
+  c.width = cw * 3;
+  c.height = ch * 3;
   var ctx = c.getContext('2d');
   // Use nearest neighbor for sharper text edges
   ctx.imageSmoothingEnabled = false;
@@ -1181,7 +1181,7 @@ function preprocessForOCR(canvas){
 }
 
 function cropForPreview(canvas){
-  var cropPct = 0.85;
+  var cropPct = 0.70;
   var cw = canvas.width * cropPct;
   var ch = canvas.height * cropPct;
   var cx = (canvas.width - cw) / 2;
@@ -1406,7 +1406,7 @@ renderHome();
 <div id="versionFooter" style="position:fixed;bottom:0;left:0;right:0;text-align:center;padding:4px;font-size:10px;color:var(--muted);background:var(--bg);border-top:1px solid var(--border);z-index:50;pointer-events:none;"></div>
 <script>
 (function(){
-  var v = 'v1.2.4';
+  var v = 'v1.2.5';
   var b = document.querySelector('.bnav');
   var f = document.getElementById('versionFooter');
   if(f) f.textContent = 'GroceryScan ' + v + ' · ' + new Date().toLocaleDateString('en-PH',{month:'short',day:'numeric'});
